@@ -7,85 +7,116 @@ st.title("🤖 Chatbot de la Institución Educativa")
 st.write("Bienvenido al sistema de atención institucional.")
 
 # Menú Principal
-menu = st.selectbox(
+menu_principal = st.selectbox(
     "Seleccione el módulo que desea consultar:",
     [
         "--- Seleccione una opción ---",
         "1. Información Académica y Calificaciones",
-        "2. Pagos, Facturación y Pruebas Saber",
+        "2. Pagos y Facturación",
         "3. Horarios de Atención y Biblioteca",
         "4. Asesoría, Psicología y Bienestar",
         "5. Quejas, Reclamos y Sugerencias (PQRS)"
     ]
 )
 
-# ============================================================
+# ==============================================================================
 # MÓDULO 1: INFORMACIÓN ACADÉMICA Y CALIFICACIONES
-# ============================================================
-if menu == "1. Información Académica y Calificaciones":
-    st.header("📚 Módulo de Información Académica")
-    
-    op_acad = st.selectbox("Seleccione sección:", ["--- Seleccione ---", "Primaria", "Bachillerato", "Sistema de Evaluación"])
-    
-    if op_acad == "Primaria":
-        st.subheader("Grados de Primaria")
-        grado_p = st.selectbox("Seleccione el grado:", ["--- Seleccione ---", "Transición", "Primero (1°)", "Segundo (2°)", "Tercero (3°)", "Cuarto (4°)", "Quinto (5°)"])
-        
-        if grado_p != "--- Seleccione ---":
-            if grado_p == "Transición":
-                materias = ["Dimensión Socio Afectiva", "Dimensión Comunicativa", "Dimensión Cognitiva", "Dimensión Corporal", "Dimensión Artística"]
-            else:
-                materias = ["Matemáticas", "Estadística", "Geometría", "Ciencias Naturales", "Ciencias Sociales", "Ética", "Castellano", "Inglés"]
-            
-            mat_sel = st.selectbox("Seleccione la asignatura a consultar:", ["--- Seleccione ---"] + materias)
-            
-            if mat_sel != "--- Seleccione ---":
-                st.markdown(f"### Calificaciones: {mat_sel.upper()}")
-                st.write("**Componentes de evaluación (Primaria):**")
-                st.write("- **70%:** Cognitivo y Procedimental (Saber y Hacer) -> Nota: 85")
-                st.write("- **30%:** Actitudinal (Convivir) -> Nota: 90")
-                st.success("**Definitiva:** 87 (Aprobado)")
-                
-    elif op_acad == "Bachillerato":
-        st.subheader("Grados de Bachillerato")
-        grado_b = st.selectbox("Seleccione el grado:", ["--- Seleccione ---", "Sexto (6°)", "Séptimo (7°)", "Octavo (8°)", "Noveno (9°)", "Décimo (10°)", "Undécimo (11°)"])
-        
-        if grado_b != "--- Seleccione ---":
-            materias_b = ["Matemáticas", "Biología", "Química", "Física", "Ciencias Sociales", "Lenguaje", "Lectura Crítica", "Filosofía", "Inglés"]
-            mat_b_sel = st.selectbox("Seleccione la asignatura:", ["--- Seleccione ---"] + materias_b)
-            
-            if mat_b_sel != "--- Seleccione ---":
-                st.markdown(f"### Calificaciones: {mat_b_sel.upper()}")
-                st.write("**Componentes de evaluación (Bachillerato):**")
-                st.write("- **70%:** Cognitivo y Procedimental (Saber y Hacer) -> Nota: 85")
-                st.write("- **25%:** Actitudinal (Convivir) -> Nota: 90")
-                st.write("- **5%:** Cognitivo (Prueba Externa) -> Nota: 60")
-                st.success("**Definitiva:** 83 (Aprobado)")
+# ==============================================================================
+def mostrar_tabla_calificaciones(materia, es_bachillerato=False):
+    nota_saber_hacer = 85.0
+    nota_convivir = 90.0
+    nota_prueba_externa = 60.0 if es_bachillerato else 0.0
 
-    elif op_acad == "Sistema de Evaluación":
-        st.subheader("Sistema de Evaluación Institucional")
+    if es_bachillerato:
+        definitiva = (nota_saber_hacer * 0.70) + (nota_convivir * 0.25) + (nota_prueba_externa * 0.05)
+    else:
+        definitiva = (nota_saber_hacer * 0.70) + (nota_convivir * 0.30)
+
+    definitiva_val = int(round(definitiva))
+    nota_minima = 65
+    recuperacion_val = 0
+    nivelacion_val = 0
+
+    if definitiva_val >= nota_minima:
+        nota_final_val = definitiva_val
+    else:
+        if recuperacion_val >= nota_minima:
+            nota_final_val = recuperacion_val
+        else:
+            nota_final_val = nivelacion_val if nivelacion_val > 0 else definitiva_val
+
+    st.markdown(f"### Calificaciones: {materia.upper()}")
+    st.write(f"- **70%** | Cognitivo y Procedimental: Saber y Hacer | **{int(nota_saber_hacer)}**")
+    if es_bachillerato:
+        st.write(f"- **25%** | Actitudinal: Convivir | **{int(nota_convivir)}**")
+        st.write(f"- **5%** | Cognitivo: Prueba externa | **{int(nota_prueba_externa)}**")
+    else:
+        st.write(f"- **30%** | Actitudinal: Convivir | **{int(nota_convivir)}**")
+    
+    st.write("---")
+    st.write(f"**Definitiva:** {definitiva_val}")
+    st.write(f"**Recuperación:** {recuperacion_val}")
+    st.write(f"**Nivelación:** {nivelacion_val}")
+    st.success(f"**Nota Final:** {nota_final_val}")
+
+if menu_principal == "1. Información Académica y Calificaciones":
+    st.header("📚 Información Académica")
+    sub_op = st.selectbox("Seleccione sección:", ["--- Seleccione ---", "Primaria", "Bachillerato", "Sistema de Evaluación"])
+    
+    if sub_op == "Primaria":
+        prim_op = st.selectbox("Seleccione grado:", ["--- Seleccione ---", "Transición", "Primero (1°)", "Segundo (2°)", "Tercero (3°)", "Cuarto (4°)", "Quinto (5°)"])
+        if prim_op == "Transición":
+            dims = ["Dimensión Socio Afectiva", "Dimensión Comunicativa", "Dimensión Comunicativa Inglés", "Dimensión Cognitiva", "Dimensión Corporal", "Dimensión Artística", "Dimensión Religiosa", "Dimensión Informática", "Dimensión Convivencia"]
+            mat_sel = st.selectbox("Seleccione dimensión:", ["--- Seleccione ---"] + dims)
+            if mat_sel != "--- Seleccione ---":
+                mostrar_tabla_calificaciones(mat_sel, es_bachillerato=False)
+        elif prim_op in ["Primero (1°)", "Segundo (2°)", "Tercero (3°)", "Cuarto (4°)", "Quinto (5°)"]:
+            mats = ["Matemáticas", "Estadística", "Geometría", "Ciencias Naturales", "Ciencias Sociales", "Ética y Valores", "Cátedra de la Paz", "Artística", "Castellano", "Convivencia", "Educación Física", "Tecnología", "Educación Religiosa", "Inglés"]
+            mat_sel = st.selectbox("Seleccione materia:", ["--- Seleccione ---"] + mats)
+            if mat_sel != "--- Seleccione ---":
+                mostrar_tabla_calificaciones(mat_sel, es_bachillerato=False)
+
+    elif sub_op == "Bachillerato":
+        bach_op = st.selectbox("Seleccione grado:", ["--- Seleccione ---", "Sexto (6°)", "Séptimo (7°)", "Octavo (8°)", "Noveno (9°)", "Décimo (10°)", "Undécimo (11°)"])
+        if bach_op in ["Sexto (6°)", "Séptimo (7°)"]:
+            mats = ["Matemáticas", "Estadística", "Geometría", "Ciencias Naturales", "Ciencias Sociales", "Ética y Valores", "Cátedra de la Paz", "Artística", "Lenguaje", "Lectura Crítica", "Convivencia", "Educación Física", "Tecnología", "Educación Religiosa", "Inglés"]
+        elif bach_op == "Octavo (8°)":
+            mats = ["Matemáticas", "Estadística", "Geometría", "Ciencias Naturales", "Historia", "Geografía", "Ética y Valores", "Cátedra de la Paz", "Artística", "Lenguaje", "Lectura Crítica", "Convivencia", "Educación Física", "Tecnología", "Educación Religiosa", "Inglés"]
+        elif bach_op == "Noveno (9°)":
+            mats = ["Matemáticas", "Biología", "Química", "Física", "Historia", "Geografía", "Ética y Valores", "Cátedra de la Paz", "Artística", "Lenguaje", "Lectura Crítica", "Convivencia", "Educación Física", "Tecnología", "Educación Religiosa", "Filosofía", "Inglés"]
+        elif bach_op in ["Décimo (10°)", "Undécimo (11°)"]:
+            mats = ["Matemáticas", "Biología", "Química", "Física", "Ciencias Sociales", "Economía", "Ética y Valores", "Artística", "Lenguaje", "Lectura Crítica", "Convivencia", "Educación Física", "Tecnología", "Educación Religiosa", "Filosofía", "Inglés"]
+        else:
+            mats = []
+            
+        if mats:
+            mat_sel = st.selectbox("Seleccione materia:", ["--- Seleccione ---"] + mats)
+            if mat_sel != "--- Seleccione ---":
+                mostrar_tabla_calificaciones(mat_sel, es_bachillerato=True)
+
+    elif sub_op == "Sistema de Evaluación":
+        st.subheader("Sistema de Evaluación")
         st.write("- **Desempeño Bajo:** Requiere fortalecimiento de los aprendizajes.")
         st.write("- **Desempeño Básico:** Alcanza los aprendizajes fundamentales.")
         st.write("- **Desempeño Alto:** Alcanza satisfactoriamente los aprendizajes.")
         st.write("- **Desempeño Superior:** Demuestra un dominio destacado.")
 
-# ============================================================
+# ==============================================================================
 # MÓDULO 2: PAGOS Y FACTURACIÓN
-# ============================================================
-elif menu == "2. Pagos, Facturación y Pruebas Saber":
+# ==============================================================================
+elif menu_principal == "2. Pagos y Facturación":
     st.header("💳 Pagos y Facturación")
+    op_pagos = st.selectbox("Seleccione opción:", ["--- Seleccione ---", "Pago de Eventos", "Pruebas Saber (Grados 6° a 9°)", "Pruebas Saber y Estado (Grados 10° y 11°)", "Gestión de Facturación"])
     
-    op_pagos = st.selectbox("Seleccione servicio:", ["--- Seleccione ---", "Pago de Eventos (Día de la Familia / Rifas)", "Estado de Pruebas Saber (6° a 9°)", "Pruebas Saber y Estado (10° y 11°)"])
-    
-    if op_pagos == "Pago de Eventos (Día de la Familia / Rifas)":
-        evento = st.selectbox("Concepto:", ["Día de la Familia Javeriana ($80.000)", "Boleta Rifa Institucional ($15.000)"])
+    if op_pagos == "Pago de Eventos":
+        evento = st.selectbox("Evento:", ["Día de la Familia Javeriana ($80.000)", "Boleta Rifa Institucional ($15.000)"])
         medio = st.selectbox("Medio de pago:", ["Bancolombia (Ahorros # 458-921384-01)", "Nequi (310-892-4102)", "Daviplata (310-892-4102)", "MasterCard"])
-        ref = st.text_input("Ingrese la referencia de la transacción:")
-        if st.button("Confirmar Pago"):
+        ref = st.text_input("Ingrese la referencia / número de transacción:")
+        if st.button("Registrar Pago"):
             if ref:
                 st.success(f"[✓] Pago registrado exitosamente por {medio}. Referencia: #{ref}. En verificación por Tesorería.")
             else:
-                st.warning("Debe ingresar el número de referencia.")
+                st.warning("⚠️ Debe ingresar una referencia válida.")
                 
     elif "Pruebas Saber" in op_pagos:
         st.subheader("Estado de Pruebas Saber")
@@ -94,56 +125,78 @@ elif menu == "2. Pagos, Facturación y Pruebas Saber":
         st.write("• **Prueba 3 (Final):** $35.000 — [D] Deuda Pendiente")
         if "10° y 11°" in op_pagos:
             st.write("• **Prueba Estado Saber 11:** $65.000 — [D] Deuda Pendiente")
+        
+        p_id = st.selectbox("¿Desea pagar alguna prueba?", ["--- Seleccione ---", "Prueba 1", "Prueba 2", "Prueba 3", "Prueba Estado Saber 11"])
+        if p_id != "--- Seleccione ---":
+            medio_p = st.selectbox("Medio de pago:", ["Bancolombia", "Nequi", "Daviplata", "MasterCard"])
+            ref_p = st.text_input("Referencia de transacción:")
+            if st.button("Pagar Prueba"):
+                if ref_p:
+                    st.success(f"[✓] Pago de {p_id} registrado con éxito con referencia #{ref_p}.")
+                else:
+                    st.warning("Ingrese una referencia.")
 
+    elif op_pagos == "Gestión de Facturación":
+        doc = st.text_input("Ingrese el documento del estudiante/acudiente:")
+        if st.button("Enviar Factura Electrónica"):
+            if doc:
+                st.success(f"[✓] Factura electrónica enviada al correo registrado del ID: {doc}.")
+            else:
+                st.warning("Ingrese un documento válido.")
+        if st.button("Solicitar Paz y Salvo"):
+            st.success("[✓] Solicitud de Paz y Salvo enviada a Secretaría Administrativa.")
+
+# ==============================================================================
+# MÓDULO 3: HORARIOS DE ATENCIÓN Y BIBLIOTECA
 # ============================================================
-# MÓDULO 3: HORARIOS Y BIBLIOTECA
-# ============================================================
-elif menu == "3. Horarios de Atención y Biblioteca":
+elif menu_principal == "3. Horarios de Atención y Biblioteca":
     st.header("⏰ Horarios de Atención y Dependencias")
-    
-    op_h = st.selectbox("Seleccione dependencia:", ["--- Seleccione ---", "Administración y Secretaría", "Coordinaciones", "Biblioteca Institucional"])
+    op_h = st.selectbox("Seleccione:", ["--- Seleccione ---", "Administración y Secretaría", "Coordinaciones", "Biblioteca Institucional"])
     
     if op_h == "Administración y Secretaría":
         st.write("**Horario:** Lunes a Viernes: 8:00 AM - 10:00 AM | 2:00 PM - 4:00 PM")
-        st.write("**Teléfono:** (601) 300-123-4567 | **WhatsApp:** +57 310 987 6543")
+        st.write("• Certificados de Estudio / Notas: $12.000 COP (2 a 3 días hábiles)")
+        st.write("• Constancias de Matrícula: Sin costo para estudiantes activos")
+        st.write("• Contacto: (601) 300-123-4567 | administracion@colegio.edu.co")
     elif op_h == "Coordinaciones":
-        st.write("**Coordinación Académica:** Prof. Roberto Gómez")
-        st.write("**Coordinación de Convivencia:** Dra. María Fernanda López")
+        st.write("**Horario de Atención:** Lunes a Viernes: 8:00 AM - 11:00 AM y 2:00 PM - 4:00 PM")
+        st.write("• Coordinación Académica: Prof. Roberto Gómez (coordinacion.academica@colegio.edu.co)")
+        st.write("• Coordinación de Convivencia: Dra. María Fernanda López (convivencia@colegio.edu.co)")
     elif op_h == "Biblioteca Institucional":
-        st.write("**Norma:** No está permitido llevar libros a casa. Préstamo interno con libro de registro.")
-        st.info("Espacios de biblioteca disponibles de lunes a viernes.")
+        st.write("**Horario:** Lunes a Viernes: 7:00 AM - 12:00 PM | 1:30 PM - 6:30 PM")
+        st.write("**Reglamento:** No está permitido llevar libros a casa. Préstamo interno con libro de registro.")
 
-# ============================================================
+# ==============================================================================
 # MÓDULO 4: ASESORÍA Y PSICOLOGÍA
 # ============================================================
-elif menu == "4. Asesoría, Psicología y Bienestar":
+elif menu_principal == "4. Asesoría, Psicología y Bienestar":
     st.header("🧠 Asesoría, Psicología y Bienestar Escolar")
-    
-    servicio = st.selectbox("Área:", ["--- Seleccione ---", "Psicología Escolar", "Fonoaudiología", "Terapia Ocupacional"])
+    area = st.selectbox("Seleccione área:", ["--- Seleccione ---", "Psicología Escolar y Orientación", "Fonoaudiología Escolar", "Terapia Ocupacional"])
     
     nombre = st.text_input("Nombre completo del estudiante:")
     grado = st.text_input("Grado (ej. 8°B):")
     contacto = st.text_input("Teléfono o correo de contacto:")
     
-    if st.button("Enviar Solicitud"):
+    if st.button("Registrar Solicitud / Cita"):
         if nombre and grado and contacto:
-            st.success(f"[✓] Solicitud registrada para {nombre} ({grado}). El equipo se comunicará en 24-48 horas.")
+            st.success(f"[✓] Solicitud registrada exitosamente para {nombre} ({grado}). El equipo se pondrá en contacto en 24-48 horas.")
         else:
-            st.warning("Por favor complete todos los campos obligatorios.")
+            st.warning("⚠️ Por favor complete todos los campos.")
 
-# ============================================================
+# ==============================================================================
 # MÓDULO 5: QUEJAS, RECLAMOS Y SUGERENCIAS (PQRS)
 # ============================================================
-elif menu == "5. Quejas, Reclamos y Sugerencias (PQRS)":
-    st.header("📝 Módulo PQRS")
+elif menu_principal == "5. Quejas, Reclamos y Sugerencias (PQRS)":
+    st.header("📝 Quejas, Reclamos y Sugerencias (PQRS)")
+    cat = st.selectbox("Categoría:", ["--- Seleccione ---", "Servicios e Infraestructura", "Profesores o Personal de la Institución", "Felicitaciones o Sugerencias de Mejora"])
     
-    cat = st.selectbox("Categoría:", ["Infraestructura y Aulas", "Profesores y Personal Institucional", "Felicitaciones o Sugerencias"])
     detalle = st.text_area("Escriba los detalles de su reporte de manera respetuosa:")
     
-    if st.button("Enviar PQRS"):
+    if st.button("Enviar Reporte PQRS"):
         if len(detalle) >= 10:
-            radicado = random.randint(10000, 99999)
-            st.success(f"[✓] Mensaje guardado exitosamente. Su número de radicado es: **PQRS-{radicado}**.")
-            st.info("💡 «¡Recuerda que entre todos nos ayudamos a construir una mejor comunidad educativa!»")
+            radicado = f"PQRS-{random.randint(10000, 99999)}"
+            st.success(f"[✓] Su mensaje ha sido enviado exitosamente.")
+            st.markdown(f"**Número de Radicado:** `{radicado}`")
+            st.markdown("💡 *«¡Recuerda que entre todos nos ayudamos a construir una mejor comunidad educativa!»*")
         else:
-            st.warning("El mensaje es muy corto. Por favor proporcione más detalles.")
+            st.warning("⚠️ El mensaje es demasiado corto. Por favor proporcione más detalles.")
