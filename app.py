@@ -102,11 +102,11 @@ if menu_principal == "1. Información Académica y Calificaciones":
         st.write("- **Desempeño Superior:** Demuestra un dominio destacado.")
 
 # ==============================================================================
-# MÓDULO 2: PAGOS Y FACTURACIÓN
+# MÓDULO 2: PAGOS Y FACTURACIÓN (Actualizado sin gestión de facturación)
 # ==============================================================================
 elif menu_principal == "2. Pagos y Facturación":
     st.header("💳 Pagos y Facturación")
-    op_pagos = st.selectbox("Seleccione opción:", ["--- Seleccione ---", "Pago de Eventos", "Pruebas Saber (Grados 6° a 9°)", "Pruebas Saber y Estado (Grados 10° y 11°)", "Gestión de Facturación"])
+    op_pagos = st.selectbox("Seleccione opción:", ["--- Seleccione ---", "Pago de Eventos", "Pruebas Saber (Grados 6° a 9°)", "Pruebas Saber y Estado (Grados 10° y 11°)"])
     
     if op_pagos == "Pago de Eventos":
         evento = st.selectbox("Evento:", ["Día de la Familia Javeriana ($80.000)", "Boleta Rifa Institucional ($15.000)"])
@@ -114,7 +114,7 @@ elif menu_principal == "2. Pagos y Facturación":
         ref = st.text_input("Ingrese la referencia / número de transacción:")
         if st.button("Registrar Pago"):
             if ref:
-                st.success(f"[✓] Pago registrado exitosamente por {medio}. Referencia: #{ref}. En verificación por Tesorería.")
+                st.success(f"[✓] Pago registrado exitosamente por {medio}. Referencia: #{ref}. (Pendiente vinculación a base de datos).")
             else:
                 st.warning("⚠️ Debe ingresar una referencia válida.")
                 
@@ -136,35 +136,105 @@ elif menu_principal == "2. Pagos y Facturación":
                 else:
                     st.warning("Ingrese una referencia.")
 
-    elif op_pagos == "Gestión de Facturación":
-        doc = st.text_input("Ingrese el documento del estudiante/acudiente:")
-        if st.button("Enviar Factura Electrónica"):
-            if doc:
-                st.success(f"[✓] Factura electrónica enviada al correo registrado del ID: {doc}.")
-            else:
-                st.warning("Ingrese un documento válido.")
-        if st.button("Solicitar Paz y Salvo"):
-            st.success("[✓] Solicitud de Paz y Salvo enviada a Secretaría Administrativa.")
-
 # ==============================================================================
-# MÓDULO 3: HORARIOS DE ATENCIÓN Y BIBLIOTECA
-# ============================================================
+# MÓDULO 3: HORARIOS DE ATENCIÓN Y BIBLIOTECA (Actualizado con cupos y motivos)
+# ==============================================================================
 elif menu_principal == "3. Horarios de Atención y Biblioteca":
     st.header("⏰ Horarios de Atención y Dependencias")
     op_h = st.selectbox("Seleccione:", ["--- Seleccione ---", "Administración y Secretaría", "Coordinaciones", "Biblioteca Institucional"])
     
     if op_h == "Administración y Secretaría":
-        st.write("**Horario:** Lunes a Viernes: 8:00 AM - 10:00 AM | 2:00 PM - 4:00 PM")
-        st.write("• Certificados de Estudio / Notas: $12.000 COP (2 a 3 días hábiles)")
-        st.write("• Constancias de Matrícula: Sin costo para estudiantes activos")
+        st.write("**Horario de Atención Informativa:** Lunes a Viernes: 8:00 AM - 10:00 AM | 2:00 PM - 4:00 PM")
         st.write("• Contacto: (601) 300-123-4567 | administracion@colegio.edu.co")
+        
+        st.markdown("---")
+        st.subheader("📌 Apartar Cupo - Administración")
+        dia_admin = st.selectbox("Seleccione el día:", ["--- Seleccione ---", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"])
+        jornada_admin = st.selectbox("Seleccione jornada:", ["--- Seleccione ---", "Mañana", "Tarde"])
+        
+        if jornada_admin == "Mañana":
+            horas_admin = ["8:00 AM", "8:30 AM", "9:00 AM", "9:30 AM", "10:00 AM"]
+        elif jornada_admin == "Tarde":
+            horas_admin = ["2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM", "4:00 PM"]
+        else:
+            horas_admin = []
+            
+        if horas_admin:
+            hora_admin = st.selectbox("Seleccione la hora (cupos cada 30 min):", ["--- Seleccione ---"] + horas_admin)
+            doc_admin = st.text_input("Documento del acudiente/estudiante:")
+            if st.button("Confirmar Reserva en Administración"):
+                if dia_admin != "--- Seleccione ---" and hora_admin != "--- Seleccione ---" and doc_admin:
+                    st.success(f"[✓] Cupo apartado con éxito en Administración para el día {dia_admin} ({jornada_admin}) a las {hora_admin}.")
+                else:
+                    st.warning("⚠️ Por favor complete todos los datos para apartar el cupo.")
+
     elif op_h == "Coordinaciones":
-        st.write("**Horario de Atención:** Lunes a Viernes: 8:00 AM - 11:00 AM y 2:00 PM - 4:00 PM")
-        st.write("• Coordinación Académica: Prof. Roberto Gómez (coordinacion.academica@colegio.edu.co)")
-        st.write("• Coordinación de Convivencia: Dra. María Fernanda López (convivencia@colegio.edu.co)")
+        st.write("**Horario General:** Lunes a Viernes: 8:00 AM - 11:00 AM y 2:00 PM - 4:00 PM")
+        
+        st.markdown("---")
+        st.subheader("📌 Apartar Cupo - Coordinaciones")
+        dia_coord = st.selectbox("Seleccione el día:", ["--- Seleccione ---", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"], key="d_coord")
+        jornada_coord = st.selectbox("Seleccione jornada:", ["--- Seleccione ---", "Mañana", "Tarde"], key="j_coord")
+        
+        if jornada_coord == "Mañana":
+            horas_coord = ["8:00 AM", "8:30 AM", "9:00 AM", "9:30 AM", "10:00 AM", "10:30 AM"]
+        elif jornada_coord == "Tarde":
+            horas_coord = ["2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM", "4:00 PM"]
+        else:
+            horas_coord = []
+            
+        if horas_coord:
+            hora_coord = st.selectbox("Seleccione la hora (cupos cada 30 min):", ["--- Seleccione ---"] + horas_coord, key="h_coord")
+            nombre_coord_est = st.text_input("Nombre del estudiante / acudiente:")
+            if st.button("Confirmar Reserva en Coordinación"):
+                if dia_coord != "--- Seleccione ---" and hora_coord != "--- Seleccione ---" and nombre_coord_est:
+                    st.success(f"[✓] Cupo apartado con éxito en Coordinación para el día {dia_coord} a las {hora_coord}.")
+                else:
+                    st.warning("⚠️ Por favor complete todos los campos.")
+
     elif op_h == "Biblioteca Institucional":
         st.write("**Horario:** Lunes a Viernes: 7:00 AM - 12:00 PM | 1:30 PM - 6:30 PM")
-        st.write("**Reglamento:** No está permitido llevar libros a casa. Préstamo interno con libro de registro.")
+        st.write("**Reglamento:** No está permitido llevar libros a casa. Préstamo interno.")
+        
+        st.markdown("---")
+        st.subheader("📚 Apartar Espacio en Biblioteca")
+        sec_bib = st.selectbox("Sección:", ["--- Seleccione ---", "Primaria", "Bachillerato"])
+        dia_bib = st.selectbox("Día de la semana:", ["--- Seleccione ---", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"], key="d_bib")
+        
+        if sec_bib == "Primaria":
+            bloques_bib = [
+                "1ª Hora (7:00 - 7:50 AM)", "2ª Hora (7:50 - 8:40 AM)", 
+                "3ª Hora (8:40 - 9:40 AM)", "4ª Hora (10:00 - 10:50 AM)", 
+                "5ª Hora (10:50 - 11:40 AM)", "6ª Hora (11:40 - 12:00 PM)"
+            ]
+        elif sec_bib == "Bachillerato":
+            bloques_bib = [
+                "1ª Hora (12:30 - 1:30 PM)", "2ª Hora (1:30 - 2:25 PM)", 
+                "3ª Hora (2:25 - 3:20 PM)", "4ª Hora (3:50 - 4:45 PM)", 
+                "5ª Hora (4:45 - 5:40 PM)", "6ª Hora (5:40 - 6:30 PM)"
+            ]
+        else:
+            bloques_bib = []
+            
+        if bloques_bib:
+            hora_bib = st.selectbox("Bloque horario de clase:", ["--- Seleccione ---"] + bloques_bib)
+            
+            # Motivos requeridos antes de guardar
+            motivo_bib = st.selectbox("Seleccione el motivo de la reserva:", [
+                "--- Seleccione ---",
+                "1. Investigación grupal / Trabajo en equipo",
+                "2. Lectura y consulta individual",
+                "3. Préstamo de material de apoyo pedagógico"
+            ])
+            
+            responsable_bib = st.text_input("Nombre del docente o responsable:")
+            
+            if st.button("Apartar Espacio en Biblioteca"):
+                if dia_bib != "--- Seleccione ---" and hora_bib != "--- Seleccione ---" and motivo_bib != "--- Seleccione ---" and responsable_bib:
+                    st.success(f"[✓] Espacio apartado en Biblioteca ({sec_bib}) para el día {dia_bib} en el bloque {hora_bib}.")
+                    st.info(f"**Motivo registrado:** {motivo_bib}\n**Responsable:** {responsable_bib}")
+                else:
+                    st.warning("⚠️ Debe completar todos los campos, incluido el motivo de la reserva.")
 
 # ==============================================================================
 # MÓDULO 4: ASESORÍA Y PSICOLOGÍA
