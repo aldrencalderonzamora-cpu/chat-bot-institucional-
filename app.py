@@ -156,12 +156,17 @@ elif menu_principal == "2. Pagos y Facturación":
         grado_pre = st.selectbox("Seleccione el grado:", ["--- Seleccione ---", "10° (Décimo)", "11° (Undécimo)"])
         
         if grado_pre != "--- Seleccione ---":
-            st.write("• **Costo total acumulado:** $270.000 COP")
-            st.write("  - Preicfes Sesión 1: $70.000 — [P] Pagado")
-            st.write("  - Preicfes Sesión 2: $70.000 — [D] Deuda Pendiente")
-            st.write("  - Examen Oficial ICFES (Estado): $130.000 — [D] Deuda Pendiente (Costo mayor)")
+            st.write("• **Costo total acumulado:** $270.000 COP (4 pruebas en total)")
+            st.write("  - Preicfes Sesión 1: $45.000 — [P] Pagado")
+            st.write("  - Preicfes Sesión 2: $45.000 — [PA] Pago Atrasado")
+            st.write("  - Preicfes Sesión 3: $45.000 — [D] Deuda Pendiente")
+            st.write("  - Examen Oficial ICFES: $135.000 — [D] Deuda Pendiente (Costo mayor)")
             
-            p_pre_sel = st.selectbox("Seleccione concepto a pagar:", ["--- Seleccione ---", "Preicfes Sesión 2 - $70.000", "Examen Oficial ICFES - $130.000"])
+            p_pre_sel = st.selectbox("Seleccione concepto a pagar:", [
+                "--- Seleccione ---", 
+                "Preicfes Sesión 3 - $45.000", 
+                "Examen Oficial ICFES - $135.000"
+            ])
             if p_pre_sel != "--- Seleccione ---":
                 medio_p = st.selectbox("Medio de pago:", ["Bancolombia", "Nequi", "Daviplata", "MasterCard"])
                 ref_p = st.text_input("Referencia de transacción:")
