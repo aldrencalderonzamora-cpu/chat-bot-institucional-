@@ -111,52 +111,65 @@ if menu_principal == "1. Información Académica y Calificaciones":
 # ==============================================================================
 elif menu_principal == "2. Pagos y Facturación":
     st.header("💳 Pagos y Facturación")
-    op_pagos = st.selectbox("Seleccione opción:", ["--- Seleccione ---", "Pago de Eventos", "Pruebas Saber (Consulta por Grado)"])
+    op_pagos = st.selectbox("Seleccione opción:", [
+        "--- Seleccione ---", 
+        "Pago de Eventos", 
+        "Pruebas Saber (Grados 6° a 9°)", 
+        "Preicfes y Pruebas ICFES (Grados 10° y 11°)"
+    ])
+    
+    doc_estudiante = st.text_input("Ingrese el número de documento del estudiante:")
     
     if op_pagos == "Pago de Eventos":
-        doc_pago = st.text_input("Documento del estudiante:")
-        evento = st.selectbox("Evento:", ["Día de la Familia Javeriana ($80.000)", "Boleta Rifa Institucional ($15.000)"])
+        evento = st.selectbox("Evento:", ["Día de la Familia Javeriana ($30.000)", "Boleta Rifa Institucional ($15.000)"])
         medio = st.selectbox("Medio de pago:", ["Bancolombia (Ahorros # 458-921384-01)", "Nequi (310-892-4102)", "Daviplata (310-892-4102)", "MasterCard"])
         ref = st.text_input("Ingrese la referencia / número de transacción:")
         
         if st.button("Registrar Pago"):
-            if doc_pago and ref:
-                st.success(f"[✓] Pago registrado para el documento {doc_pago} via {medio}. Ref: #{ref}. (Listo para guardar en Base de Datos).")
+            if doc_estudiante and ref:
+                st.success(f"[✓] Pago registrado para el documento {doc_estudiante} vía {medio}. Ref: #{ref}. (Listo para Base de Datos).")
             else:
-                st.warning("⚠️ Debe ingresar el documento y una referencia válida.")
+                st.warning("⚠️ Debe ingresar el documento del estudiante y una referencia válida.")
                 
-    elif op_pagos == "Pruebas Saber (Consulta por Grado)":
-        st.subheader("🔍 Consulta de Pruebas Saber por Grado")
-        grado_prueba = st.selectbox("Seleccione el grado del estudiante:", [
-            "--- Seleccione ---", "6° (Sexto)", "7° (Séptimo)", "8° (Octavo)", "9° (Noveno)", "10° (Décimo)", "11° (Undécimo)"
-        ])
-        doc_saber = st.text_input("Ingrese el número de documento del estudiante:")
+    elif op_pagos == "Pruebas Saber (Grados 6° a 9°)":
+        st.subheader("📚 Pruebas Saber (Grados 6° a 9°)")
+        grado_saber = st.selectbox("Seleccione el grado:", ["--- Seleccione ---", "6° (Sexto)", "7° (Séptimo)", "8° (Octavo)", "9° (Noveno)"])
         
-        if grado_prueba != "--- Seleccione ---" and doc_saber:
-            st.markdown(f"---")
-            st.write(f"**Estado de Pruebas para el documento {doc_saber} en {grado_prueba}:**")
+        if grado_saber != "--- Seleccione ---":
+            st.write("• **Costo total de las 3 pruebas:** $30.000 COP")
+            st.write("  - Prueba 1 (Diagnóstica): $10.000 — [P] Pagado")
+            st.write("  - Prueba 2 (Intermedia): $10.000 — [D] Deuda Pendiente")
+            st.write("  - Prueba 3 (Final): $10.000 — [D] Deuda Pendiente")
             
-            # Simulación de deudas según el grado
-            if grado_prueba in ["10° (Décimo)", "11° (Undécimo)"]:
-                st.write("• **Prueba 1 (Diagnóstica):** $35.000 — [P] Pagado")
-                st.write("• **Prueba 2 (Intermedia):** $35.000 — [PA] Pago Atrasado")
-                st.write("• **Prueba Estado Saber 11:** $65.000 — [D] Deuda Pendiente")
-                p_elegida = st.selectbox("Seleccione prueba a pagar:", ["--- Seleccione ---", "Prueba 2 (Intermedia)", "Prueba Estado Saber 11"])
-            else:
-                st.write("• **Prueba 1 (Diagnóstica):** $35.000 — [P] Pagado")
-                st.write("• **Prueba 2 (Intermedia):** $35.000 — [D] Deuda Pendiente")
-                st.write("• **Prueba 3 (Final):** $35.000 — [P] Pagado")
-                p_elegida = st.selectbox("Seleccione prueba a pagar:", ["--- Seleccione ---", "Prueba 2 (Intermedia)"])
-                
-            if p_elegida != "--- Seleccione ---":
-                medio_sp = st.selectbox("Medio de pago:", ["Bancolombia", "Nequi", "Daviplata", "MasterCard"])
-                ref_sp = st.text_input("Número de referencia de transacción:")
-                if st.button("Pagar Prueba Seleccionada"):
-                    if ref_sp:
-                        st.success(f"[✓] Pago de {p_elegida} procesado correctamente para el documento {doc_saber} con ref #{ref_sp}.")
+            p_saber_sel = st.selectbox("Seleccione la prueba a pagar:", ["--- Seleccione ---", "Prueba 2 (Intermedia) - $10.000", "Prueba 3 (Final) - $10.000"])
+            if p_saber_sel != "--- Seleccione ---":
+                medio_s = st.selectbox("Medio de pago:", ["Bancolombia", "Nequi", "Daviplata", "MasterCard"])
+                ref_s = st.text_input("Referencia de transacción:")
+                if st.button("Pagar Prueba Saber"):
+                    if doc_estudiante and ref_s:
+                        st.success(f"[✓] Pago de {p_saber_sel} registrado para el documento {doc_estudiante} en {grado_saber} con ref #{ref_s}.")
                     else:
-                        st.warning("⚠️ Ingrese la referencia de pago.")
-
+                        st.warning("⚠️ Ingrese el documento del estudiante y la referencia de pago.")
+                        
+    elif op_pagos == "Preicfes y Pruebas ICFES (Grados 10° y 11°)":
+        st.subheader("🎓 Preicfes y Pruebas ICFES (Grados 10° y 11°)")
+        grado_pre = st.selectbox("Seleccione el grado:", ["--- Seleccione ---", "10° (Décimo)", "11° (Undécimo)"])
+        
+        if grado_pre != "--- Seleccione ---":
+            st.write("• **Costo total acumulado:** $270.000 COP")
+            st.write("  - Preicfes Sesión 1: $70.000 — [P] Pagado")
+            st.write("  - Preicfes Sesión 2: $70.000 — [D] Deuda Pendiente")
+            st.write("  - Examen Oficial ICFES (Estado): $130.000 — [D] Deuda Pendiente (Costo mayor)")
+            
+            p_pre_sel = st.selectbox("Seleccione concepto a pagar:", ["--- Seleccione ---", "Preicfes Sesión 2 - $70.000", "Examen Oficial ICFES - $130.000"])
+            if p_pre_sel != "--- Seleccione ---":
+                medio_p = st.selectbox("Medio de pago:", ["Bancolombia", "Nequi", "Daviplata", "MasterCard"])
+                ref_p = st.text_input("Referencia de transacción:")
+                if st.button("Pagar Concepto Preicfes/ICFES"):
+                    if doc_estudiante and ref_p:
+                        st.success(f"[✓] Pago de {p_pre_sel} registrado para el documento {doc_estudiante} en {grado_pre} con ref #{ref_p}.")
+                    else:
+                        st.warning("⚠️ Ingrese el documento del estudiante y la referencia de pago.")
 # ==============================================================================
 # MÓDULO 3: HORARIOS DE ATENCIÓN Y BIBLIOTECA
 # ==============================================================================
