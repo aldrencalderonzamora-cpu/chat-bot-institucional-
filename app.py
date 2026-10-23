@@ -147,8 +147,8 @@ if menu_principal == "1. Información Académica y Calificaciones":
                     seed_val = int(doc_academico) + sum(ord(c) for c in mat_sel)
                     rng = random.Random(seed_val)
                     
-                    sh = round(rng.uniform(40.0, 98.0), 1)
-                    conv = round(rng.uniform(30.0, 100.0), 1)
+                    sh = round(rng.uniform(30.0, 98.0), 1)
+                    conv = round(rng.uniform(60.0, 100.0), 1)
                     ext = round(rng.uniform(20.0, 100.0), 1) if es_bach else 0.0
                     
                     if es_bach:
