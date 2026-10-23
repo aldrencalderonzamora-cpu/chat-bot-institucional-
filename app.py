@@ -147,9 +147,9 @@ if menu_principal == "1. Información Académica y Calificaciones":
                     seed_val = int(doc_academico) + sum(ord(c) for c in mat_sel)
                     rng = random.Random(seed_val)
                     
-                    sh = round(rng.uniform(65.0, 98.0), 1)
-                    conv = round(rng.uniform(70.0, 100.0), 1)
-                    ext = round(rng.uniform(60.0, 95.0), 1) if es_bach else 0.0
+                    sh = round(rng.uniform(40.0, 98.0), 1)
+                    conv = round(rng.uniform(30.0, 100.0), 1)
+                    ext = round(rng.uniform(20.0, 100.0), 1) if es_bach else 0.0
                     
                     if es_bach:
                         definitiva = int(round((sh * 0.70) + (conv * 0.25) + (ext * 0.05)))
@@ -191,7 +191,7 @@ elif menu_principal == "2. Pagos y Facturación":
                 est_id, nombre_est, grado_est = est_info[0], est_info[1], est_info[2]
                 st.success(f"Estudiante: **{nombre_est}** | Grado: **{grado_est}**")
                 
-                # Filtro estricto por grados
+                # Filtro por grados
                 es_primaria = any(g in grado_est for g in ["Transición", "Primero", "Segundo", "Tercero", "Cuarto", "Quinto", "1°", "2°", "3°", "4°", "5°"])
                 es_media = any(g in grado_est for g in ["Sexto", "Séptimo", "Octavo", "Noveno", "6°", "7°", "8°", "9°"])
                 es_alta = any(g in grado_est for g in ["Décimo", "Undécimo", "10°", "11°"])
@@ -205,7 +205,6 @@ elif menu_principal == "2. Pagos y Facturación":
                 op_pagos = st.selectbox("Seleccione la categoría de pago:", opciones_disponibles)
                 
                 if op_pagos != "--- Seleccione ---":
-                    # Definir ítems específicos según la categoría
                     if op_pagos == "Pago de Eventos":
                         sub_conceptos = ["Día de la Familia Javeriana ($30.000)", "Boleta Rifa Institucional ($15.000)"]
                     elif op_pagos == "Pruebas Saber (Grados 6° a 9°)":
@@ -216,27 +215,47 @@ elif menu_principal == "2. Pagos y Facturación":
                     concepto_sel = st.selectbox("Seleccione el concepto específico:", ["--- Seleccione ---"] + sub_conceptos)
                     
                     if concepto_sel != "--- Seleccione ---":
-                        # Lógica aleatoria basada en semilla (Documento + Concepto)
-                        seed_val = int(doc_estudiante) + sum(ord(c) for c in concepto_sel)
+                        # ------------------------------------------------------
+                        # LÓGICA DE JERARQUÍA / PRELACIÓN
+                        # ------------------------------------------------------
+                        # Semilla única basada en el Documento + la Categoría de Pago
+                        seed_val = int(doc_estudiante) + sum(ord(c) for c in op_pagos)
                         rng = random.Random(seed_val)
-                        estado_aleatorio = rng.choice(["DEBE", "PAGADO"])
                         
-                        # Validar si ya existe un registro de pago real en Aiven
+                        # Determina hasta qué índice de la lista tiene pagado (Nivel de avance)
+                        # Ej: Nivel 0 = Ninguno pagado | Nivel 1 = Pagado hasta el primer ítem, etc.
+                        nivel_pago_aleatorio = rng.randint(0, len(sub_conceptos))
+                        posicion_actual = sub_conceptos.index(concepto_sel)
+                        
+                        # Validar si existe un pago registrado de forma real en Aiven
                         with conn.session as s:
                             pago_db = s.execute(text("""
                                 SELECT referencia_transaccion FROM pagos 
                                 WHERE estudiante_id = :eid AND concepto = :conc AND estado = 'Aprobado'
                             """), {"eid": est_id, "conc": concepto_sel}).fetchone()
                         
-                        # Si está en Aiven es PAGADO; si no, toma el valor aleatorio de la semilla
-                        estado_final = "PAGADO" if pago_db else estado_aleatorio
-                        ref_mostrada = pago_db[0] if pago_db else f"REF-AUTO-{rng.randint(1000,9999)}"
+                        # Regla Jerárquica: Si la posición del ítem es menor al nivel alcanzado o ya se pagó en DB -> PAGADO
+                        if pago_db or posicion_actual < nivel_pago_aleatorio:
+                            estado_final = "PAGADO"
+                            ref_mostrada = pago_db[0] if pago_db else f"REF-SEQ-{rng.randint(1000, 9999)}"
+                        else:
+                            estado_final = "DEBE"
                         
                         st.write("---")
                         if estado_final == "PAGADO":
-                            st.info(f"🟢 **Estado de la cuenta:** **PAGADO** (Ref: #{ref_mostrada}). El estudiante se encuentra al día.")
+                            st.info(f"🟢 **Estado del concepto:** **PAGADO** (Ref: #{ref_mostrada}). El estudiante se encuentra al día con esta obligación.")
                         else:
-                            st.warning(f"🔴 **Estado de la cuenta:** **DEBE**. El estudiante tiene este concepto pendiente.")
+                            st.warning(f"🔴 **Estado del concepto:** **DEBE**. Debe cancelar esta prueba/sesión para continuar en la secuencia.")
+                            
+                            # Verificar si la prueba anterior está pendiente para mostrar advertencia de prelación
+                            if posicion_actual > 0:
+                                concepto_anterior = sub_conceptos[posicion_actual - 1]
+                                with conn.session as s:
+                                    pago_ant_db = s.execute(text("SELECT id FROM pagos WHERE estudiante_id = :eid AND concepto = :conc AND estado = 'Aprobado'"), {"eid": est_id, "conc": concepto_anterior}).fetchone()
+                                
+                                if not pago_ant_db and (posicion_actual - 1) >= nivel_pago_aleatorio:
+                                    st.caption(f"⚠️ *Nota: Se recomienda cancelar primero el concepto previo ({concepto_anterior}).*")
+
                             medio = st.selectbox("Medio de pago:", ["Bancolombia", "Nequi", "Daviplata", "MasterCard"])
                             ref_input = st.text_input("Ingrese la referencia de la transacción:")
                             
@@ -252,19 +271,18 @@ elif menu_principal == "2. Pagos y Facturación":
                                                 s.execute(text("INSERT INTO pagos (estudiante_id, concepto, valor, medio_pago, referencia_transaccion, estado) VALUES (:eid, :conc, :val, :med, :ref, 'Aprobado')"),
                                                           {"eid": est_id, "conc": concepto_sel, "val": val_pago, "med": medio, "ref": ref_input})
                                                 s.commit()
-                                                st.success(f"[✓] ¡Pago registrado con éxito en Aiven!")
+                                                st.success(f"[✓] ¡Pago guardado con éxito en Aiven!")
                                                 st.rerun()
                                     except Exception as ex:
                                         st.error("⚠️ Error al registrar el pago.")
                                 else:
-                                    st.warning("⚠️ Ingrese una referencia de transacción válida.")
+                                    st.warning("⚠️ Ingrese una referencia válida.")
             else:
                 st.error("⚠️ El documento ingresado no se encuentra registrado en la base de datos.")
         except Exception as ex:
             st.warning("⚠️ Error al consultar la información.")
     else:
         st.info("💡 Ingrese el número de documento del estudiante para ver su estado de cuenta.")
-               
 # ==============================================================================
 # MÓDULO 3: HORARIOS DE ATENCIÓN Y BIBLIOTECA
 # ==============================================================================
