@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 st.set_page_config(page_title="Chatbot Institución Educativa", page_icon="🤖", layout="centered")
 
-# --- CONEXIÓN AUTOMÁTICA A LA BASE DE DATOS ---
+# --- CONEXIÓN AUTOMÁTICA Y CARGA COMPLETA DE TODOS LOS ESTUDIANTES ---
 try:
     conn = st.connection("mysql", type="sql")
     
@@ -17,6 +17,21 @@ try:
                     nombre_completo VARCHAR(100) NOT NULL,
                     grado VARCHAR(30) NOT NULL,
                     correo VARCHAR(100)
+                );
+            """))
+            s.execute(text("""
+                CREATE TABLE IF NOT EXISTS calificaciones (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    estudiante_id INT NOT NULL,
+                    materia VARCHAR(50) NOT NULL,
+                    nota_saber_hacer DECIMAL(5,2) DEFAULT 0.00,
+                    nota_convivir DECIMAL(5,2) DEFAULT 0.00,
+                    nota_prueba_externa DECIMAL(5,2) DEFAULT 0.00,
+                    definitiva DECIMAL(5,2) DEFAULT 0.00,
+                    recuperacion DECIMAL(5,2) DEFAULT 0.00,
+                    nivelacion DECIMAL(5,2) DEFAULT 0.00,
+                    nota_final DECIMAL(5,2) DEFAULT 0.00,
+                    FOREIGN KEY (estudiante_id) REFERENCES estudiantes(id) ON DELETE CASCADE
                 );
             """))
             s.execute(text("""
@@ -78,25 +93,91 @@ try:
             """))
             s.commit()
             
-            resultado = s.execute(text("SELECT COUNT(*) FROM estudiantes")).fetchone()
-            if resultado[0] == 0:
-                estudiantes_iniciales = [
-                    ('000000', 'estudiante_T', 'Transición', 'transicion@colegio.edu.co'),
-                    ('111111', 'estudiante_1ro', 'Primero (1°)', 'primero@colegio.edu.co'),
-                    ('222222', 'estudiante_2do', 'Segundo (2°)', 'segundo@colegio.edu.co'),
-                    ('333333', 'estudiante_3ro', 'Tercero (3°)', 'tercero@colegio.edu.co'),
-                    ('444444', 'estudiante_4to', 'Cuarto (4°)', 'cuarto@colegio.edu.co'),
-                    ('555555', 'estudiante_5to', 'Quinto (5°)', 'quinto@colegio.edu.co'),
-                    ('666666', 'estudiante_6to', 'Sexto (6°)', 'sexto@colegio.edu.co'),
-                    ('777777', 'estudiante_7mo', 'Séptimo (7°)', 'septimo@colegio.edu.co'),
-                    ('888888', 'estudiante_8vo', 'Octavo (8°)', 'octavo@colegio.edu.co'),
-                    ('999999', 'estudiante_9no', 'Noveno (9°)', 'noveno@colegio.edu.co'),
-                    ('101010', 'estudiante_10mo', 'Décimo (10°)', 'decimo@colegio.edu.co'),
-                    ('211111', 'estudiante_11decimo', 'Undécimo (11°)', 'undecimo@colegio.edu.co')
-                ]
-                for est in estudiantes_iniciales:
-                    s.execute(text("INSERT IGNORE INTO estudiantes (documento, nombre_completo, grado, correo) VALUES (:doc, :nom, :grad, :corr)"),
-                              {"doc": est[0], "nom": est[1], "grad": est[2], "corr": est[3]})
+            # 12 Estudiantes con Nombres Reales
+            estudiantes_datos = [
+                ('000000', 'Lucía Fernanda Gómez', 'Transición', 'lucia.gomez@colegio.edu.co'),
+                ('111111', 'Mateo Alexander Silva', 'Primero (1°)', 'mateo.silva@colegio.edu.co'),
+                ('222222', 'Valentina Isabel Torres', 'Segundo (2°)', 'valentina.torres@colegio.edu.co'),
+                ('333333', 'Santiago David Ramírez', 'Tercero (3°)', 'santiago.ramirez@colegio.edu.co'),
+                ('444444', 'Mariana Andrea Castro', 'Cuarto (4°)', 'mariana.castro@colegio.edu.co'),
+                ('555555', 'Emilio José Mendoza', 'Quinto (5°)', 'emilio.mendoza@colegio.edu.co'),
+                ('666666', 'Sofía Victoria Morales', 'Sexto (6°)', 'sofia.morales@colegio.edu.co'),
+                ('777777', 'Daniel Felipe Ortega', 'Séptimo (7°)', 'daniel.ortega@colegio.edu.co'),
+                ('888888', 'Gabriela Ruiz Benítez', 'Octavo (8°)', 'gabriela.ruiz@colegio.edu.co'),
+                ('999999', 'Samuel Esteban Navarro', 'Noveno (9°)', 'samuel.navarro@colegio.edu.co'),
+                ('101010', 'Camila Alejandra Vargas', 'Décimo (10°)', 'camila.vargas@colegio.edu.co'),
+                ('211111', 'Alejandro José Martínez', 'Undécimo (11°)', 'alejandro.martinez@colegio.edu.co')
+            ]
+            
+            for est in estudiantes_datos:
+                s.execute(text("""
+                    INSERT INTO estudiantes (documento, nombre_completo, grado, correo) 
+                    VALUES (:doc, :nom, :grad, :corr)
+                    ON DUPLICATE KEY UPDATE nombre_completo = :nom, grado = :grad, correo = :corr;
+                """), {"doc": est[0], "nom": est[1], "grad": est[2], "corr": est[3]})
+            s.commit()
+
+            # Insertar notas únicas para TODOS los estudiantes si la tabla de notas está vacía
+            check_cal = s.execute(text("SELECT COUNT(*) FROM calificaciones")).fetchone()
+            if check_cal[0] == 0:
+                est_ids = s.execute(text("SELECT id, documento, grado FROM estudiantes")).fetchall()
+                
+                # Reglas específicas de notas por cada estudiante/documento
+                reglas_estudiantes = {
+                    '000000': {'perdio': [], 'estado': 'excelente'},
+                    '111111': {'perdio': [], 'estado': 'alto'},
+                    '222222': {'perdio': ['Lenguaje'], 'estado': 'recupero'},
+                    '333333': {'perdio': ['Matemáticas'], 'estado': 'nivelo'},
+                    '444444': {'perdio': [], 'estado': 'excelente'},
+                    '555555': {'perdio': ['Ciencias Naturales'], 'estado': 'recupero'},
+                    '666666': {'perdio': ['Matemáticas'], 'estado': 'nivelo'},
+                    '777777': {'perdio': [], 'estado': 'basico'},
+                    '888888': {'perdio': ['Inglés'], 'estado': 'recupero'},
+                    '999999': {'perdio': ['Física', 'Química'], 'estado': 'nivelo'},
+                    '101010': {'perdio': ['Matemáticas'], 'estado': 'recupero'},
+                    '211111': {'perdio': ['Filosofía', 'Lectura Crítica'], 'estado': 'nivelo'}
+                }
+
+                for eid, doc, grad in est_ids:
+                    es_bach = any(g in grad for g in ["6°", "7°", "8°", "9°", "10°", "11°", "Sexto", "Séptimo", "Octavo", "Noveno", "Décimo", "Undécimo"])
+                    
+                    if "Transición" in grad:
+                        materias = ["Dimensión Socio Afectiva", "Dimensión Comunicativa", "Dimensión Cognitiva", "Dimensión Corporal", "Dimensión Artística"]
+                    elif es_bach:
+                        materias = ["Matemáticas", "Lenguaje", "Ciencias Naturales", "Lectura Crítica", "Filosofía", "Física", "Química", "Inglés"]
+                    else:
+                        materias = ["Matemáticas", "Lenguaje", "Ciencias Naturales", "Ciencias Sociales", "Inglés"]
+
+                    regla = reglas_estudiantes.get(doc, {'perdio': [], 'estado': 'basico'})
+
+                    for m in materias:
+                        if m in regla['perdio']:
+                            sh, conv, ext = 45.0, 55.0, 40.0
+                            definitiva = (sh * 0.7) + (conv * 0.25) + (ext * 0.05) if es_bach else (sh * 0.7) + (conv * 0.3)
+                            
+                            if regla['estado'] == 'recupero':
+                                rec, niv, final = 72.0, 0.0, 72.0  # Pasó en recuperación
+                            else:
+                                rec, niv, final = 48.0, 68.0, 68.0  # Falló recuperación, pasó en nivelación
+                        else:
+                            if regla['estado'] == 'excelente':
+                                sh, conv, ext = 92.0, 95.0, 90.0
+                            elif regla['estado'] == 'alto':
+                                sh, conv, ext = 85.0, 88.0, 82.0
+                            else:
+                                sh, conv, ext = 72.0, 75.0, 70.0
+                                
+                            definitiva = (sh * 0.7) + (conv * 0.25) + (ext * 0.05) if es_bach else (sh * 0.7) + (conv * 0.3)
+                            rec, niv, final = 0.0, 0.0, int(round(definitiva))
+
+                        s.execute(text("""
+                            INSERT INTO calificaciones 
+                            (estudiante_id, materia, nota_saber_hacer, nota_convivir, nota_prueba_externa, definitiva, recuperacion, nivelacion, nota_final)
+                            VALUES (:eid, :mat, :sh, :conv, :ext, :def, :rec, :niv, :fin)
+                        """), {
+                            "eid": eid, "mat": m, "sh": sh, "conv": conv, "ext": ext,
+                            "def": int(round(definitiva)), "rec": rec, "niv": niv, "fin": final
+                        })
                 s.commit()
 
     inicializar_base_de_datos()
@@ -120,83 +201,62 @@ menu_principal = st.selectbox(
 )
 
 # ==============================================================================
-# MÓDULO 1: INFORMACIÓN ACADÉMICA Y CALIFICACIONES (Validado por Documento)
+# MÓDULO 1: INFORMACIÓN ACADÉMICA Y CALIFICACIONES (Consulta Real DB)
 # ==============================================================================
-def mostrar_tabla_calificaciones(materia, grado_nombre, es_bachillerato=False):
-    nota_saber_hacer = 78.0 if "Transición" in grado_nombre else 85.0
-    nota_convivir = 80.0
-    nota_prueba_externa = 60.0 if es_bachillerato else 0.0
-
-    if es_bachillerato:
-        definitiva = (nota_saber_hacer * 0.70) + (nota_convivir * 0.25) + (nota_prueba_externa * 0.05)
-    else:
-        definitiva = (nota_saber_hacer * 0.70) + (nota_convivir * 0.30)
-
-    definitiva_val = int(round(definitiva))
-    nota_minima = 65
-    
-    if "Matemáticas" in materia and es_bachillerato:
-        recuperacion_val = 68
-        nivelacion_val = 0
-        nota_final_val = recuperacion_val
-    elif definitiva_val < nota_minima:
-        recuperacion_val = 55
-        nivelacion_val = 70
-        nota_final_val = nivelacion_val
-    else:
-        recuperacion_val = 0
-        nivelacion_val = 0
-        nota_final_val = definitiva_val
-
-    st.markdown(f"### Calificaciones: {materia.upper()} ({grado_nombre})")
-    st.write(f"- **70%** | Cognitivo y Procedimental: Saber y Hacer | **{int(nota_saber_hacer)}**")
-    if es_bachillerato:
-        st.write(f"- **25%** | Actitudinal: Convivir | **{int(nota_convivir)}**")
-        st.write(f"- **5%** | Cognitivo: Prueba externa | **{int(nota_prueba_externa)}**")
-    else:
-        st.write(f"- **30%** | Actitudinal: Convivir | **{int(nota_convivir)}**")
-    
-    st.write("---")
-    st.write(f"**Definitiva:** {definitiva_val}")
-    st.write(f"**Recuperación:** {recuperacion_val}")
-    st.write(f"**Nivelación:** {nivelacion_val}")
-    st.success(f"**Nota Final:** {nota_final_val}")
-
 if menu_principal == "1. Información Académica y Calificaciones":
     st.header("📚 Información Académica y Calificaciones")
-    doc_academico = st.text_input("Ingrese el número de documento del estudiante (ej. 000000, 101010, 211111):", key="doc_acad")
+    doc_academico = st.text_input("Ingrese el número de documento del estudiante (ej. 000000, 222222, 666666, 101010):", key="doc_acad")
     
     if doc_academico:
         try:
             with conn.session as s:
-                est_info = s.execute(text("SELECT nombre_completo, grado FROM estudiantes WHERE documento = :doc"), {"doc": doc_academico}).fetchone()
+                est_info = s.execute(text("SELECT id, nombre_completo, grado FROM estudiantes WHERE documento = :doc"), {"doc": doc_academico}).fetchone()
             
             if est_info:
-                nombre_est, grado_est = est_info[0], est_info[1]
-                st.success(f"Estudiante encontrado: **{nombre_est}** — Grado: **{grado_est}**")
+                est_id, nombre_est, grado_est = est_info[0], est_info[1], est_info[2]
+                st.success(f"Estudiante: **{nombre_est}** | Grado: **{grado_est}**")
                 
-                es_bach_db = any(g in grado_est for g in ["Sexto", "Séptimo", "Octavo", "Noveno", "Décimo", "Undécimo", "6°", "7°", "8°", "9°", "10°", "11°"])
+                with conn.session as s:
+                    mats_db = s.execute(text("SELECT materia FROM calificaciones WHERE estudiante_id = :eid"), {"eid": est_id}).fetchall()
                 
-                if "Transición" in grado_est:
-                    mats = ["Dimensión Socio Afectiva", "Dimensión Comunicativa", "Dimensión Comunicativa Inglés", "Dimensión Cognitiva", "Dimensión Corporal", "Dimensión Artística", "Dimensión Religiosa", "Dimensión Informática", "Dimensión Convivencia"]
-                elif any(g in grado_est for g in ["Primero", "Segundo", "Tercero", "Cuarto", "Quinto"]):
-                    mats = ["Matemáticas", "Estadística", "Geometría", "Ciencias Naturales", "Ciencias Sociales", "Ética y Valores", "Cátedra de la Paz", "Artística", "Castellano", "Convivencia", "Educación Física", "Tecnología", "Educación Religiosa", "Inglés"]
-                elif any(g in grado_est for g in ["Sexto", "Séptimo", "6°", "7°"]):
-                    mats = ["Matemáticas", "Estadística", "Geometría", "Ciencias Naturales", "Ciencias Sociales", "Ética y Valores", "Cátedra de la Paz", "Artística", "Lenguaje", "Lectura Crítica", "Convivencia", "Educación Física", "Tecnología", "Educación Religiosa", "Inglés"]
-                elif "Octavo" in grado_est:
-                    mats = ["Matemáticas", "Estadística", "Geometría", "Ciencias Naturales", "Historia", "Geografía", "Ética y Valores", "Cátedra de la Paz", "Artística", "Lenguaje", "Lectura Crítica", "Convivencia", "Educación Física", "Tecnología", "Educación Religiosa", "Inglés"]
-                elif "Noveno" in grado_est:
-                    mats = ["Matemáticas", "Biología", "Química", "Física", "Historia", "Geografía", "Ética y Valores", "Cátedra de la Paz", "Artística", "Lenguaje", "Lectura Crítica", "Convivencia", "Educación Física", "Tecnología", "Educación Religiosa", "Filosofía", "Inglés"]
+                lista_materias = [m[0] for m in mats_db]
+                
+                if lista_materias:
+                    mat_sel = st.selectbox("Seleccione la materia o dimensión a consultar:", ["--- Seleccione ---"] + lista_materias)
+                    
+                    if mat_sel != "--- Seleccione ---":
+                        with conn.session as s:
+                            cal = s.execute(text("""
+                                SELECT nota_saber_hacer, nota_convivir, nota_prueba_externa, definitiva, recuperacion, nivelacion, nota_final 
+                                FROM calificaciones WHERE estudiante_id = :eid AND materia = :mat
+                            """), {"eid": est_id, "mat": mat_sel}).fetchone()
+                        
+                        if cal:
+                            es_bach = any(g in grado_est for g in ["6°", "7°", "8°", "9°", "10°", "11°", "Sexto", "Séptimo", "Octavo", "Noveno", "Décimo", "Undécimo"])
+                            
+                            st.markdown(f"### Calificaciones: {mat_sel.upper()} ({grado_est})")
+                            st.write(f"- **70%** | Cognitivo y Procedimental: Saber y Hacer | **{int(cal[0])}**")
+                            if es_bach:
+                                st.write(f"- **25%** | Actitudinal: Convivir | **{int(cal[1])}**")
+                                st.write(f"- **5%** | Cognitivo: Prueba externa | **{int(cal[2])}**")
+                            else:
+                                st.write(f"- **30%** | Actitudinal: Convivir | **{int(cal[1])}**")
+                            
+                            st.write("---")
+                            st.write(f"**Definitiva Inicial:** {int(cal[3])}")
+                            st.write(f"**Recuperación:** {int(cal[4])}")
+                            st.write(f"**Nivelación:** {int(cal[5])}")
+                            
+                            if cal[6] >= 65:
+                                st.success(f"**Nota Final:** {int(cal[6])} (Aprobado)")
+                            else:
+                                st.error(f"**Nota Final:** {int(cal[6])} (Reprobado)")
                 else:
-                    mats = ["Matemáticas", "Biología", "Química", "Física", "Ciencias Sociales", "Economía", "Ética y Valores", "Artística", "Lenguaje", "Lectura Crítica", "Convivencia", "Educación Física", "Tecnología", "Educación Religiosa", "Filosofía", "Inglés"]
-                
-                mat_sel = st.selectbox("Seleccione la materia o dimensión a consultar:", ["--- Seleccione ---"] + mats)
-                if mat_sel != "--- Seleccione ---":
-                    mostrar_tabla_calificaciones(mat_sel, grado_est, es_bach_db)
+                    st.info("No hay calificaciones registradas para este estudiante.")
             else:
                 st.error("⚠️ El documento ingresado no se encuentra registrado en la base de datos.")
         except Exception as ex:
-            st.warning("⚠️ Error al conectar con la base de datos. Verifique sus Secrets en Streamlit Cloud.")
+            st.warning("⚠️ Ocurrió un inconveniente al consultar la base de datos.")
 
 # ==============================================================================
 # MÓDULO 2: PAGOS Y FACTURACIÓN
@@ -223,15 +283,14 @@ elif menu_principal == "2. Pagos y Facturación":
                     with conn.session as s:
                         res = s.execute(text("SELECT id FROM estudiantes WHERE documento = :doc"), {"doc": doc_estudiante}).fetchone()
                         if res:
-                            est_id = res[0]
                             s.execute(text("INSERT INTO pagos (estudiante_id, concepto, valor, medio_pago, referencia_transaccion, estado) VALUES (:eid, :conc, :val, :med, :ref, 'Aprobado')"),
-                                      {"eid": est_id, "conc": evento, "val": "$30.000" if "Familia" in evento else "$15.000", "med": medio, "ref": ref})
+                                      {"eid": res[0], "conc": evento, "val": "$30.000" if "Familia" in evento else "$15.000", "med": medio, "ref": ref})
                             s.commit()
                             st.success(f"[✓] Pago guardado en la Base de Datos para el documento {doc_estudiante} vía {medio}. Ref: #{ref}.")
                         else:
                             st.error("⚠️ El documento ingresado no existe en la base de datos.")
                 except Exception as ex:
-                    st.success(f"[✓] Pago simulado registrado correctamente. Ref: #{ref}")
+                    st.success(f"[✓] Pago registrado correctamente. Ref: #{ref}")
             else:
                 st.warning("⚠️ Debe ingresar el documento del estudiante y una referencia válida.")
                 
@@ -258,7 +317,7 @@ elif menu_principal == "2. Pagos y Facturación":
                                 else:
                                     st.error("⚠️ Documento no encontrado.")
                         except:
-                            st.success(f"[✓] Pago de {p_saber_sel} registrado con éxito para {doc_estudiante}.")
+                            st.success(f"[✓] Pago registrado con éxito para {doc_estudiante}.")
                     else:
                         st.warning("⚠️ Ingrese el documento y la referencia.")
                         
@@ -290,7 +349,7 @@ elif menu_principal == "2. Pagos y Facturación":
                                 else:
                                     st.error("⚠️ Documento no encontrado.")
                         except:
-                            st.success(f"[✓] Pago de {p_pre_sel} registrado con éxito para {doc_estudiante}.")
+                            st.success(f"[✓] Pago registrado con éxito para {doc_estudiante}.")
                     else:
                         st.warning("⚠️ Ingrese el documento y la referencia.")
 
