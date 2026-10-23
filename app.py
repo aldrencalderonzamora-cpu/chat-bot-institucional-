@@ -1,5 +1,6 @@
 import streamlit as st
 import random
+from sqlalchemy import text
 
 st.set_page_config(page_title="Chatbot Institución Educativa", page_icon="🤖", layout="centered")
 
@@ -9,7 +10,7 @@ try:
     
     # Asegurar que las tablas existan en Aiven
     with conn.session as s:
-        s.execute("""
+        s.execute(text("""
             CREATE TABLE IF NOT EXISTS estudiantes (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 documento VARCHAR(20) UNIQUE NOT NULL,
@@ -17,8 +18,8 @@ try:
                 grado VARCHAR(30) NOT NULL,
                 correo VARCHAR(100)
             );
-        """)
-        s.execute("""
+        """))
+        s.execute(text("""
             CREATE TABLE IF NOT EXISTS pagos (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 estudiante_id INT NOT NULL,
@@ -29,8 +30,8 @@ try:
                 estado VARCHAR(30) DEFAULT 'Pendiente',
                 fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
-        """)
-        s.execute("""
+        """))
+        s.execute(text("""
             CREATE TABLE IF NOT EXISTS reservas_dependencias (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 dependencia VARCHAR(50) NOT NULL, 
@@ -39,8 +40,8 @@ try:
                 hora VARCHAR(20) NOT NULL,       
                 documento_o_nombre VARCHAR(100) NOT NULL
             );
-        """)
-        s.execute("""
+        """))
+        s.execute(text("""
             CREATE TABLE IF NOT EXISTS reservas_biblioteca (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 seccion VARCHAR(20) NOT NULL, 
@@ -50,8 +51,8 @@ try:
                 motivo VARCHAR(150) NOT NULL,
                 estado VARCHAR(10) DEFAULT 'RES'
             );
-        """)
-        s.execute("""
+        """))
+        s.execute(text("""
             CREATE TABLE IF NOT EXISTS citas_psicologia (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 estudiante_nombre VARCHAR(100) NOT NULL,
@@ -60,8 +61,8 @@ try:
                 modalidad VARCHAR(50) NOT NULL, 
                 estado VARCHAR(30) DEFAULT 'Solicitada'
             );
-        """)
-        s.execute("""
+        """))
+        s.execute(text("""
             CREATE TABLE IF NOT EXISTS pqrs (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 radicado VARCHAR(30) UNIQUE NOT NULL,
@@ -70,11 +71,11 @@ try:
                 detalle TEXT NOT NULL,
                 estado VARCHAR(50) DEFAULT 'Enviado'
             );
-        """)
+        """))
         s.commit()
         
         # Insertar los 12 estudiantes base si está vacía la tabla
-        res = s.execute("SELECT COUNT(*) FROM estudiantes").fetchone()
+        res = s.execute(text("SELECT COUNT(*) FROM estudiantes")).fetchone()
         if res[0] == 0:
             estudiantes_iniciales = [
                 ('000000', 'Lucía Fernanda Gómez', 'Transición', 'lucia.gomez@colegio.edu.co'),
@@ -91,7 +92,7 @@ try:
                 ('211111', 'Alejandro José Martínez', 'Undécimo (11°)', 'alejandro.martinez@colegio.edu.co')
             ]
             for est in estudiantes_iniciales:
-                s.execute("INSERT IGNORE INTO estudiantes (documento, nombre_completo, grado, correo) VALUES (:doc, :nom, :grad, :corr)",
+                s.execute(text("INSERT IGNORE INTO estudiantes (documento, nombre_completo, grado, correo) VALUES (:doc, :nom, :grad, :corr)"),
                           {"doc": est[0], "nom": est[1], "grad": est[2], "corr": est[3]})
             s.commit()
 except Exception as e:
@@ -123,7 +124,7 @@ if menu_principal == "1. Información Académica y Calificaciones":
     if doc_academico:
         try:
             with conn.session as s:
-                est_info = s.execute("SELECT nombre_completo, grado FROM estudiantes WHERE documento = :doc", {"doc": doc_academico}).fetchone()
+                est_info = s.execute(text("SELECT nombre_completo, grado FROM estudiantes WHERE documento = :doc"), {"doc": doc_academico}).fetchone()
             
             if est_info:
                 nombre_est, grado_est = est_info[0], est_info[1]
@@ -193,10 +194,10 @@ elif menu_principal == "2. Pagos y Facturación":
             if doc_estudiante and ref:
                 try:
                     with conn.session as s:
-                        res = s.execute("SELECT id FROM estudiantes WHERE documento = :doc", {"doc": doc_estudiante}).fetchone()
+                        res = s.execute(text("SELECT id FROM estudiantes WHERE documento = :doc"), {"doc": doc_estudiante}).fetchone()
                         if res:
                             val_pago = "$30.000" if "Familia" in evento else "$15.000"
-                            s.execute("INSERT INTO pagos (estudiante_id, concepto, valor, medio_pago, referencia_transaccion, estado) VALUES (:eid, :conc, :val, :med, :ref, 'Aprobado')",
+                            s.execute(text("INSERT INTO pagos (estudiante_id, concepto, valor, medio_pago, referencia_transaccion, estado) VALUES (:eid, :conc, :val, :med, :ref, 'Aprobado')"),
                                       {"eid": res[0], "conc": evento, "val": val_pago, "med": medio, "ref": ref})
                             s.commit()
                             st.success(f"[✓] Pago guardado en la Base de Datos. Ref: #{ref}")
@@ -248,7 +249,7 @@ elif menu_principal == "3. Horarios de Atención y Biblioteca":
             if dia != "--- Seleccione ---" and hora != "--- Seleccione ---" and doc_res:
                 try:
                     with conn.session as s:
-                        s.execute("INSERT INTO reservas_dependencias (dependencia, dia, jornada, hora, documento_o_nombre) VALUES (:dep, :dia, :jor, :hor, :doc)",
+                        s.execute(text("INSERT INTO reservas_dependencias (dependencia, dia, jornada, hora, documento_o_nombre) VALUES (:dep, :dia, :jor, :hor, :doc)"),
                                   {"dep": op_h, "dia": dia, "jor": jornada, "hor": hora, "doc": doc_res})
                         s.commit()
                         st.success(f"[✓] Cupo guardado en Aiven para {op_h} el {dia} a las {hora}.")
@@ -268,7 +269,7 @@ elif menu_principal == "3. Horarios de Atención y Biblioteca":
             if sec != "--- Seleccione ---" and dia_b != "--- Seleccione ---" and bloque != "--- Seleccione ---" and motivo != "--- Seleccione ---" and responsable:
                 try:
                     with conn.session as s:
-                        s.execute("INSERT INTO reservas_biblioteca (seccion, dia, hora_bloque, responsable, motivo, estado) VALUES (:sec, :dia, :hor, :resp, :mot, 'RES')",
+                        s.execute(text("INSERT INTO reservas_biblioteca (seccion, dia, hora_bloque, responsable, motivo, estado) VALUES (:sec, :dia, :hor, :resp, :mot, 'RES')"),
                                   {"sec": sec, "dia": dia_b, "hor": bloque, "resp": responsable, "mot": motivo})
                         s.commit()
                         st.success(f"[✓] Espacio guardado en Aiven para Biblioteca ({sec}).")
@@ -292,7 +293,7 @@ elif menu_principal == "4. Asesoría, Psicología y Bienestar":
         if nombre_p and grado_p and contacto_p:
             try:
                 with conn.session as s:
-                    s.execute("INSERT INTO citas_psicologia (estudiante_nombre, grado, contacto, modalidad, estado) VALUES (:nom, :grad, :cont, :mod, 'Solicitada')",
+                    s.execute(text("INSERT INTO citas_psicologia (estudiante_nombre, grado, contacto, modalidad, estado) VALUES (:nom, :grad, :cont, :mod, 'Solicitada')"),
                               {"nom": nombre_p, "grad": grado_p, "cont": contacto_p, "mod": modalidad_p})
                     s.commit()
                     st.success(f"[✓] Cita guardada en Aiven para {nombre_p}.")
@@ -315,7 +316,7 @@ elif menu_principal == "5. Quejas, Reclamos y Sugerencias (PQRS)":
             radicado = f"PQRS-{random.randint(10000, 99999)}"
             try:
                 with conn.session as s:
-                    s.execute("INSERT INTO pqrs (radicado, categoria, subcategoria, detalle, estado) VALUES (:rad, :cat, :sub, :det, 'Enviado')",
+                    s.execute(text("INSERT INTO pqrs (radicado, categoria, subcategoria, detalle, estado) VALUES (:rad, :cat, :sub, :det, 'Enviado')"),
                               {"rad": radicado, "cat": cat, "sub": subcat, "det": detalle})
                     s.commit()
                     st.success(f"[✓] Reporte guardado en Aiven.")
