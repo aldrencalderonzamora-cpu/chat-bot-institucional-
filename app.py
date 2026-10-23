@@ -177,65 +177,159 @@ if menu_principal == "1. Información Académica y Calificaciones":
 # ==============================================================================
 elif menu_principal == "2. Pagos y Facturación":
     st.header("💳 Pagos y Facturación")
-    op_pagos = st.selectbox("Seleccione opción:", [
-        "--- Seleccione ---", 
-        "Pago de Eventos", 
-        "Pruebas Saber (Grados 6° a 9°)", 
-        "Preicfes y Pruebas ICFES (Grados 10° y 11°)"
-    ])
     
-    doc_estudiante = st.text_input("Ingrese el número de documento del estudiante:")
+    doc_estudiante = st.text_input("Ingrese el número de documento del estudiante (ej. 000000, 101010, 211111):", key="doc_pago")
     
-    if op_pagos == "Pago de Eventos":
-        evento = st.selectbox("Evento:", ["Día de la Familia Javeriana ($30.000)", "Boleta Rifa Institucional ($15.000)"])
-        medio = st.selectbox("Medio de pago:", ["Bancolombia", "Nequi", "Daviplata", "MasterCard"])
-        ref = st.text_input("Referencia de transacción:")
-        if st.button("Registrar Pago"):
-            if doc_estudiante and ref:
-                try:
+    if doc_estudiante:
+        try:
+            with conn.session as s:
+                est_info = s.execute(text("SELECT id, nombre_completo, grado FROM estudiantes WHERE documento = :doc"), {"doc": doc_estudiante}).fetchone()
+            
+            if est_info:
+                est_id, nombre_est, grado_est = est_info[0], est_info[1], est_info[2]
+                st.success(f"Estudiante: **{nombre_est}** | Grado: **{grado_est}**")
+                
+                op_pagos = st.selectbox("Seleccione el concepto a consultar/pagar:", [
+                    "--- Seleccione ---", 
+                    "Pago de Eventos", 
+                    "Pruebas Saber (Grados 6° a 9°)", 
+                    "Preicfes y Pruebas ICFES (Grados 10° y 11°)"
+                ])
+                
+                # --------------------------------------------------------------
+                # OPCIÓN 1: PAGO DE EVENTOS
+                # --------------------------------------------------------------
+                if op_pagos == "Pago de Eventos":
+                    evento = st.selectbox("Evento:", ["Día de la Familia Javeriana ($30.000)", "Boleta Rifa Institucional ($15.000)"])
+                    
+                    # Consultar si ya pagó este evento
                     with conn.session as s:
-                        res = s.execute(text("SELECT id FROM estudiantes WHERE documento = :doc"), {"doc": doc_estudiante}).fetchone()
-                        if res:
-                            # Validar si ya se registró esa misma referencia de transacción
-                            dup_ref = s.execute(text("SELECT COUNT(*) FROM pagos WHERE referencia_transaccion = :ref"), {"ref": ref}).fetchone()[0]
-                            if dup_ref > 0:
-                                st.error(f"⚠️ La referencia de transacción #{ref} ya fue registrada anteriormente.")
+                        pago_existente = s.execute(text("""
+                            SELECT referencia_transaccion, fecha_registro FROM pagos 
+                            WHERE estudiante_id = :eid AND concepto = :conc AND estado = 'Aprobado'
+                        """), {"eid": est_id, "conc": evento}).fetchone()
+                    
+                    if pago_existente:
+                        st.info(f"✅ **Estado:** AL DÍA. El estudiante **ya canceló** este concepto (Ref: #{pago_existente[0]}). No es necesario pagar nuevamente.")
+                    else:
+                        st.warning("⚠️ **Estado:** PENDIENTE DE PAGO.")
+                        medio = st.selectbox("Medio de pago:", ["Bancolombia", "Nequi", "Daviplata", "MasterCard"])
+                        ref = st.text_input("Ingrese la referencia / número de transacción:")
+                        
+                        if st.button("Registrar Pago de Evento"):
+                            if ref:
+                                try:
+                                    with conn.session as s:
+                                        # Validar que la referencia no sea repetida de otro pago
+                                        dup_ref = s.execute(text("SELECT COUNT(*) FROM pagos WHERE referencia_transaccion = :ref"), {"ref": ref}).fetchone()[0]
+                                        if dup_ref > 0:
+                                            st.error(f"⚠️ La referencia de transacción #{ref} ya fue registrada en el sistema.")
+                                        else:
+                                            val_pago = "$30.000" if "Familia" in evento else "$15.000"
+                                            s.execute(text("INSERT INTO pagos (estudiante_id, concepto, valor, medio_pago, referencia_transaccion, estado) VALUES (:eid, :conc, :val, :med, :ref, 'Aprobado')"),
+                                                      {"eid": est_id, "conc": evento, "val": val_pago, "med": medio, "ref": ref})
+                                            s.commit()
+                                            st.success(f"[✓] Pago registrado e ingresado con éxito en Aiven para {nombre_est}. Ref: #{ref}")
+                                            st.rerun()
+                                except Exception as ex:
+                                    st.error("⚠️ Error al procesar la transacción.")
                             else:
-                                val_pago = "$30.000" if "Familia" in evento else "$15.000"
-                                s.execute(text("INSERT INTO pagos (estudiante_id, concepto, valor, medio_pago, referencia_transaccion, estado) VALUES (:eid, :conc, :val, :med, :ref, 'Aprobado')"),
-                                          {"eid": res[0], "conc": evento, "val": val_pago, "med": medio, "ref": ref})
-                                s.commit()
-                                st.success(f"[✓] Pago guardado en la Base de Datos. Ref: #{ref}")
+                                st.warning("⚠️ Ingrese la referencia de la transacción.")
+
+                # --------------------------------------------------------------
+                # OPCIÓN 2: PRUEBAS SABER (6° a 9°)
+                # --------------------------------------------------------------
+                elif op_pagos == "Pruebas Saber (Grados 6° a 9°)":
+                    st.subheader("📚 Pruebas Saber (Grados 6° a 9°)")
+                    st.write("• **Costo total:** $30.000 COP ($10.000 por cada prueba)")
+                    
+                    p_saber = st.selectbox("Seleccione prueba:", ["--- Seleccione ---", "Prueba 1 (Inicial) - $10.000", "Prueba 2 (Intermedia) - $10.000", "Prueba 3 (Final) - $10.000"])
+                    
+                    if p_saber != "--- Seleccione ---":
+                        with conn.session as s:
+                            pago_existente = s.execute(text("""
+                                SELECT referencia_transaccion FROM pagos 
+                                WHERE estudiante_id = :eid AND concepto = :conc AND estado = 'Aprobado'
+                            """), {"eid": est_id, "conc": p_saber}).fetchone()
+                        
+                        if pago_existente:
+                            st.info(f"✅ **Estado:** PAGADO. Esta prueba ya fue cancelada (Ref: #{pago_existente[0]}).")
                         else:
-                            st.error("⚠️ Documento no encontrado.")
-                except Exception as ex:
-                    st.warning("⚠️ Error al procesar el pago.")
-            else:
-                st.warning("⚠️ Ingrese documento y referencia.")
+                            st.warning("⚠️ **Estado:** PENDIENTE.")
+                            medio_s = st.selectbox("Medio de pago:", ["Bancolombia", "Nequi", "Daviplata", "MasterCard"])
+                            ref_s = st.text_input("Referencia de transacción:")
+                            
+                            if st.button("Pagar Prueba Saber"):
+                                if ref_s:
+                                    try:
+                                        with conn.session as s:
+                                            dup_ref = s.execute(text("SELECT COUNT(*) FROM pagos WHERE referencia_transaccion = :ref"), {"ref": ref_s}).fetchone()[0]
+                                            if dup_ref > 0:
+                                                st.error(f"⚠️ La referencia #{ref_s} ya está registrada.")
+                                            else:
+                                                s.execute(text("INSERT INTO pagos (estudiante_id, concepto, valor, medio_pago, referencia_transaccion, estado) VALUES (:eid, :conc, '$10.000', :med, :ref, 'Aprobado')"),
+                                                          {"eid": est_id, "conc": p_saber, "med": medio_s, "ref": ref_s})
+                                                s.commit()
+                                                st.success(f"[✓] Pago de {p_saber} guardado con éxito.")
+                                                st.rerun()
+                                    except Exception as ex:
+                                        st.error("⚠️ Error al registrar el pago.")
+                                else:
+                                    st.warning("⚠️ Ingrese la referencia de transacción.")
 
-    elif op_pagos == "Pruebas Saber (Grados 6° a 9°)":
-        st.subheader("📚 Pruebas Saber (Grados 6° a 9°)")
-        st.write("• **Costo total:** $30.000 COP ($10.000 c/u)")
-        p_saber = st.selectbox("Seleccione prueba:", ["--- Seleccione ---", "Prueba 2 - $10.000", "Prueba 3 - $10.000"])
-        medio_s = st.selectbox("Medio de pago:", ["Bancolombia", "Nequi", "Daviplata", "MasterCard"])
-        ref_s = st.text_input("Referencia de transacción:")
-        if st.button("Pagar Prueba Saber"):
-            if doc_estudiante and ref_s:
-                st.success(f"[✓] Pago de {p_saber} registrado con éxito. Ref: #{ref_s}")
+                # --------------------------------------------------------------
+                # OPCIÓN 3: PREICFES Y PRUEBAS ICFES (10° y 11°)
+                # --------------------------------------------------------------
+                elif op_pagos == "Preicfes y Pruebas ICFES (Grados 10° y 11°)":
+                    st.subheader("🎓 Preicfes y Pruebas ICFES")
+                    st.write("• **Costo total:** $270.000 COP (3 Preicfes de $45.000 + Examen ICFES $135.000)")
+                    
+                    p_pre = st.selectbox("Seleccione concepto:", [
+                        "--- Seleccione ---", 
+                        "Preicfes Sesión 1 - $45.000", 
+                        "Preicfes Sesión 2 - $45.000", 
+                        "Preicfes Sesión 3 - $45.000", 
+                        "Examen Oficial ICFES - $135.000"
+                    ])
+                    
+                    if p_pre != "--- Seleccione ---":
+                        with conn.session as s:
+                            pago_existente = s.execute(text("""
+                                SELECT referencia_transaccion FROM pagos 
+                                WHERE estudiante_id = :eid AND concepto = :conc AND estado = 'Aprobado'
+                            """), {"eid": est_id, "conc": p_pre}).fetchone()
+                        
+                        if pago_existente:
+                            st.info(f"✅ **Estado:** PAGADO. El estudiante ya canceló este concepto (Ref: #{pago_existente[0]}).")
+                        else:
+                            st.warning("⚠️ **Estado:** PENDIENTE DE PAGO.")
+                            medio_p = st.selectbox("Medio de pago:", ["Bancolombia", "Nequi", "Daviplata", "MasterCard"])
+                            ref_p = st.text_input("Referencia de transacción:")
+                            
+                            if st.button("Pagar Concepto Preicfes/ICFES"):
+                                if ref_p:
+                                    try:
+                                        with conn.session as s:
+                                            dup_ref = s.execute(text("SELECT COUNT(*) FROM pagos WHERE referencia_transaccion = :ref"), {"ref": ref_p}).fetchone()[0]
+                                            if dup_ref > 0:
+                                                st.error(f"⚠️ La referencia #{ref_p} ya está registrada en la base de datos.")
+                                            else:
+                                                val_pago = "$135.000" if "ICFES" in p_pre else "$45.000"
+                                                s.execute(text("INSERT INTO pagos (estudiante_id, concepto, valor, medio_pago, referencia_transaccion, estado) VALUES (:eid, :conc, :val, :med, :ref, 'Aprobado')"),
+                                                          {"eid": est_id, "conc": p_pre, "val": val_pago, "med": medio_p, "ref": ref_p})
+                                                s.commit()
+                                                st.success(f"[✓] Pago de {p_pre} guardado con éxito.")
+                                                st.rerun()
+                                    except Exception as ex:
+                                        st.error("⚠️ Error al registrar la transacción.")
+                                else:
+                                    st.warning("⚠️ Ingrese la referencia de la transacción.")
             else:
-                st.warning("⚠️ Ingrese documento y referencia.")
-
-    elif op_pagos == "Preicfes y Pruebas ICFES (Grados 10° y 11°)":
-        st.subheader("🎓 Preicfes y Pruebas ICFES (Grados 10° y 11°)")
-        st.write("• **Costo total:** $270.000 COP (3 Preicfes de $45.000 + 1 ICFES de $135.000)")
-        p_pre = st.selectbox("Seleccione concepto:", ["--- Seleccione ---", "Preicfes Sesión 3 - $45.000", "Examen Oficial ICFES - $135.000"])
-        medio_p = st.selectbox("Medio de pago:", ["Bancolombia", "Nequi", "Daviplata", "MasterCard"])
-        ref_p = st.text_input("Referencia de transacción:")
-        if st.button("Pagar Concepto Preicfes/ICFES"):
-            if doc_estudiante and ref_p:
-                st.success(f"[✓] Pago de {p_pre} registrado con éxito. Ref: #{ref_p}")
-            else:
-                st.warning("⚠️ Ingrese documento y referencia.")
+                st.error("⚠️ El documento ingresado no se encuentra registrado en la base de datos.")
+        except Exception as ex:
+            st.warning("⚠️ Error al consultar la información de pagos.")
+    else:
+        st.info("💡 Ingrese el documento del estudiante para verificar su estado de cuenta y habilitar los pagos.")
 
 # ==============================================================================
 # MÓDULO 3: HORARIOS DE ATENCIÓN Y BIBLIOTECA (Filtros de hora estrictos)
