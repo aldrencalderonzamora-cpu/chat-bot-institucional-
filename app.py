@@ -191,13 +191,23 @@ elif menu_principal == "2. Pagos y Facturación":
                 est_id, nombre_est, grado_est = est_info[0], est_info[1], est_info[2]
                 st.success(f"Estudiante: **{nombre_est}** | Grado: **{grado_est}**")
                 
-                op_pagos = st.selectbox("Seleccione el concepto a consultar/pagar:", [
-                    "--- Seleccione ---", 
-                    "Pago de Eventos", 
-                    "Pruebas Saber (Grados 6° a 9°)", 
-                    "Preicfes y Pruebas ICFES (Grados 10° y 11°)"
-                ])
+                # Definir qué opciones de pago tiene disponibles según el grado
+                es_primaria = any(g in grado_est for g in ["Transición", "Primero", "Segundo", "Tercero", "Cuarto", "Quinto", "1°", "2°", "3°", "4°", "5°"])
+                es_media = any(g in grado_est for g in ["Sexto", "Séptimo", "Octavo", "Noveno", "6°", "7°", "8°", "9°"])
+                es_alta = any(g in grado_est for g in ["Décimo", "Undécimo", "10°", "11°"])
                 
+                opciones_disponibles = ["--- Seleccione ---", "Pago de Eventos"]
+                
+                if es_media:
+                    opciones_disponibles.append("Pruebas Saber (Grados 6° a 9°)")
+                elif es_alta:
+                    opciones_disponibles.append("Preicfes y Pruebas ICFES (Grados 10° y 11°)")
+                
+                op_pagos = st.selectbox("Seleccione el concepto a consultar/pagar:", opciones_disponibles)
+                
+                # --------------------------------------------------------------
+                # OPCIÓN 1: PAGO DE EVENTOS (Todos los grados)
+                # --------------------------------------------------------------
                 if op_pagos == "Pago de Eventos":
                     evento = st.selectbox("Evento:", ["Día de la Familia Javeriana ($30.000)", "Boleta Rifa Institucional ($15.000)"])
                     
@@ -233,6 +243,9 @@ elif menu_principal == "2. Pagos y Facturación":
                             else:
                                 st.warning("⚠️ Ingrese la referencia de la transacción.")
 
+                # --------------------------------------------------------------
+                # OPCIÓN 2: PRUEBAS SABER (Solo 6° a 9°)
+                # --------------------------------------------------------------
                 elif op_pagos == "Pruebas Saber (Grados 6° a 9°)":
                     st.subheader("📚 Pruebas Saber (Grados 6° a 9°)")
                     p_saber = st.selectbox("Seleccione prueba:", ["--- Seleccione ---", "Prueba 1 (Inicial) - $10.000", "Prueba 2 (Intermedia) - $10.000", "Prueba 3 (Final) - $10.000"])
@@ -269,6 +282,9 @@ elif menu_principal == "2. Pagos y Facturación":
                                 else:
                                     st.warning("⚠️ Ingrese la referencia de transacción.")
 
+                # --------------------------------------------------------------
+                # OPCIÓN 3: PREICFES Y PRUEBAS ICFES (Solo 10° y 11°)
+                # --------------------------------------------------------------
                 elif op_pagos == "Preicfes y Pruebas ICFES (Grados 10° y 11°)":
                     st.subheader("🎓 Preicfes y Pruebas ICFES")
                     p_pre = st.selectbox("Seleccione concepto:", [
@@ -315,6 +331,8 @@ elif menu_principal == "2. Pagos y Facturación":
                 st.error("⚠️ El documento ingresado no se encuentra registrado en la base de datos.")
         except Exception as ex:
             st.warning("⚠️ Error al consultar la información de pagos.")
+    else:
+        st.info("💡 Ingrese el documento del estudiante para consultar las opciones disponibles según su grado.")
 
 # ==============================================================================
 # MÓDULO 3: HORARIOS DE ATENCIÓN Y BIBLIOTECA
