@@ -8,7 +8,7 @@ st.set_page_config(page_title="Chatbot Institución Educativa", page_icon="🤖"
 try:
     conn = st.connection("mysql", type="sql")
     
-    # Asegurar que las tablas existan en Aiven
+    # Asegurar tablas con estructura robusta
     with conn.session as s:
         s.execute(text("""
             CREATE TABLE IF NOT EXISTS estudiantes (
@@ -196,15 +196,20 @@ elif menu_principal == "2. Pagos y Facturación":
                     with conn.session as s:
                         res = s.execute(text("SELECT id FROM estudiantes WHERE documento = :doc"), {"doc": doc_estudiante}).fetchone()
                         if res:
-                            val_pago = "$30.000" if "Familia" in evento else "$15.000"
-                            s.execute(text("INSERT INTO pagos (estudiante_id, concepto, valor, medio_pago, referencia_transaccion, estado) VALUES (:eid, :conc, :val, :med, :ref, 'Aprobado')"),
-                                      {"eid": res[0], "conc": evento, "val": val_pago, "med": medio, "ref": ref})
-                            s.commit()
-                            st.success(f"[✓] Pago guardado en la Base de Datos. Ref: #{ref}")
+                            # Validar si ya se registró esa misma referencia de transacción
+                            dup_ref = s.execute(text("SELECT COUNT(*) FROM pagos WHERE referencia_transaccion = :ref"), {"ref": ref}).fetchone()[0]
+                            if dup_ref > 0:
+                                st.error(f"⚠️ La referencia de transacción #{ref} ya fue registrada anteriormente.")
+                            else:
+                                val_pago = "$30.000" if "Familia" in evento else "$15.000"
+                                s.execute(text("INSERT INTO pagos (estudiante_id, concepto, valor, medio_pago, referencia_transaccion, estado) VALUES (:eid, :conc, :val, :med, :ref, 'Aprobado')"),
+                                          {"eid": res[0], "conc": evento, "val": val_pago, "med": medio, "ref": ref})
+                                s.commit()
+                                st.success(f"[✓] Pago guardado en la Base de Datos. Ref: #{ref}")
                         else:
                             st.error("⚠️ Documento no encontrado.")
-                except:
-                    st.success(f"[✓] Pago registrado correctamente. Ref: #{ref}")
+                except Exception as ex:
+                    st.warning("⚠️ Error al procesar el pago.")
             else:
                 st.warning("⚠️ Ingrese documento y referencia.")
 
@@ -233,24 +238,33 @@ elif menu_principal == "2. Pagos y Facturación":
                 st.warning("⚠️ Ingrese documento y referencia.")
 
 # ==============================================================================
-# MÓDULO 3: HORARIOS DE ATENCIÓN Y BIBLIOTECA (Con Validación Anti-Duplicados)
+# MÓDULO 3: HORARIOS DE ATENCIÓN Y BIBLIOTECA (Filtros de hora estrictos)
 # ==============================================================================
 elif menu_principal == "3. Horarios de Atención y Biblioteca":
     st.header("⏰ Horarios de Atención y Biblioteca")
     op_h = st.selectbox("Seleccione:", ["--- Seleccione ---", "Administración y Secretaría", "Coordinaciones", "Biblioteca Institucional"])
     
     if op_h in ["Administración y Secretaría", "Coordinaciones"]:
-        st.write(f"**Horario de atención:** Lunes a Viernes: 8:00 AM - 11:00 AM y 2:00 PM - 4:00 PM")
+        st.write(f"**Horario de atención general:** Lunes a Viernes (Mañana: 8:00 AM - 10:00 AM | Tarde: 2:00 PM - 4:00 PM)")
         dia = st.selectbox("Día:", ["--- Seleccione ---", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"])
         jornada = st.selectbox("Jornada:", ["--- Seleccione ---", "Mañana", "Tarde"])
-        hora = st.selectbox("Hora:", ["--- Seleccione ---", "8:00 AM", "9:00 AM", "10:00 AM", "2:00 PM", "3:00 PM"])
+        
+        # Filtro estricto de horas según la jornada seleccionada
+        if jornada == "Mañana":
+            hora = st.selectbox("Hora:", ["--- Seleccione ---", "8:00 AM", "8:30 AM", "9:00 AM", "9:30 AM", "10:00 AM"])
+        elif jornada == "Tarde":
+            hora = st.selectbox("Hora:", ["--- Seleccione ---", "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM", "4:00 PM"])
+        else:
+            hora = "--- Seleccione ---"
+            st.info("💡 Seleccione una jornada para habilitar las horas correspondientes.")
+
         doc_res = st.text_input("Documento o Nombre:")
         
         if st.button("Confirmar Reserva"):
-            if dia != "--- Seleccione ---" and hora != "--- Seleccione ---" and doc_res:
+            if dia != "--- Seleccione ---" and jornada != "--- Seleccione ---" and hora != "--- Seleccione ---" and doc_res:
                 try:
                     with conn.session as s:
-                        # Validar si ya existe un cupo en esa fecha/hora
+                        # Validar si ya existe un cupo en esa fecha/hora exacta
                         verificar = s.execute(text("""
                             SELECT COUNT(*) FROM reservas_dependencias 
                             WHERE dependencia = :dep AND dia = :dia AND jornada = :jor AND hora = :hor
@@ -262,17 +276,42 @@ elif menu_principal == "3. Horarios de Atención y Biblioteca":
                             s.execute(text("INSERT INTO reservas_dependencias (dependencia, dia, jornada, hora, documento_o_nombre) VALUES (:dep, :dia, :jor, :hor, :doc)"),
                                       {"dep": op_h, "dia": dia, "jor": jornada, "hor": hora, "doc": doc_res})
                             s.commit()
-                            st.success(f"[✓] ¡Cupo guardado con éxito en Aiven para {op_h} ({dia} - {hora})!")
+                            st.success(f"[✓] ¡Cupo guardado con éxito en Aiven para {op_h} ({dia} {jornada} - {hora})!")
                 except Exception as ex:
                     st.warning("⚠️ Ocurrió un error al validar o guardar la reserva.")
             else:
-                st.warning("⚠️ Complete todos los campos.")
+                st.warning("⚠️ Complete todos los campos correctamente.")
 
     elif op_h == "Biblioteca Institucional":
         st.write("**Horario:** Lunes a Viernes: 7:00 AM - 12:00 PM | 1:30 PM - 6:30 PM")
         sec = st.selectbox("Sección:", ["--- Seleccione ---", "Primaria", "Bachillerato"])
         dia_b = st.selectbox("Día:", ["--- Seleccione ---", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"])
-        bloque = st.selectbox("Bloque horario:", ["--- Seleccione ---", "1ª Hora (7:00 - 7:50 AM)", "2ª Hora (7:50 - 8:40 AM)", "3ª Hora (10:00 - 10:50 AM)"])
+        
+        # Bloques horarios correctos según la sección
+        if sec == "Primaria":
+            bloques_disp = [
+                "--- Seleccione ---",
+                "1ª Hora (7:00 - 7:50 AM)",
+                "2ª Hora (7:50 - 8:40 AM)",
+                "3ª Hora (8:40 - 9:40 AM)",
+                "4ª Hora (10:00 - 10:50 AM)",
+                "5ª Hora (10:50 - 11:40 AM)",
+                "6ª Hora (11:40 - 12:00 PM)"
+            ]
+        elif sec == "Bachillerato":
+            bloques_disp = [
+                "--- Seleccione ---",
+                "1ª Hora (12:30 - 1:30 PM)",
+                "2ª Hora (1:30 - 2:25 PM)",
+                "3ª Hora (2:25 - 3:20 PM)",
+                "4ª Hora (3:50 - 4:45 PM)",
+                "5ª Hora (4:45 - 5:40 PM)",
+                "6ª Hora (5:40 - 6:30 PM)"
+            ]
+        else:
+            bloques_disp = ["--- Seleccione ---"]
+            
+        bloque = st.selectbox("Bloque horario de clase:", bloques_disp)
         motivo = st.selectbox("Motivo:", ["--- Seleccione ---", "1. Investigación grupal", "2. Lectura individual", "3. Préstamo de material"])
         responsable = st.text_input("Nombre del docente o responsable:")
         
@@ -299,7 +338,7 @@ elif menu_principal == "3. Horarios de Atención y Biblioteca":
                 st.warning("⚠️ Complete todos los campos, incluido el motivo.")
 
 # ==============================================================================
-# MÓDULO 4: ASESORÍA Y PSICOLOGÍA
+# MÓDULO 4: ASESORÍA Y PSICOLOGÍA (Con validación de duplicados)
 # ==============================================================================
 elif menu_principal == "4. Asesoría, Psicología y Bienestar":
     st.header("🧠 Asesoría, Psicología y Bienestar Escolar")
@@ -313,17 +352,26 @@ elif menu_principal == "4. Asesoría, Psicología y Bienestar":
         if nombre_p and grado_p and contacto_p:
             try:
                 with conn.session as s:
-                    s.execute(text("INSERT INTO citas_psicologia (estudiante_nombre, grado, contacto, modalidad, estado) VALUES (:nom, :grad, :cont, :mod, 'Solicitada')"),
-                              {"nom": nombre_p, "grad": grado_p, "cont": contacto_p, "mod": modalidad_p})
-                    s.commit()
-                    st.success(f"[✓] Cita guardada en Aiven para {nombre_p}.")
-            except:
-                st.success(f"[✓] Solicitud registrada con éxito.")
+                    # Evitar solicitudes idénticas repetidas por spam de clics
+                    dup_cita = s.execute(text("""
+                        SELECT COUNT(*) FROM citas_psicologia 
+                        WHERE estudiante_nombre = :nom AND contacto = :cont AND estado = 'Solicitada'
+                    """), {"nom": nombre_p, "cont": contacto_p}).fetchone()[0]
+                    
+                    if dup_cita > 0:
+                        st.warning(f"⚠️ Ya existe una solicitud de cita pendiente registrada para **{nombre_p}** con este contacto.")
+                    else:
+                        s.execute(text("INSERT INTO citas_psicologia (estudiante_nombre, grado, contacto, modalidad, estado) VALUES (:nom, :grad, :cont, :mod, 'Solicitada')"),
+                                  {"nom": nombre_p, "grad": grado_p, "cont": contacto_p, "mod": modalidad_p})
+                        s.commit()
+                        st.success(f"[✓] Cita guardada en Aiven para {nombre_p}. Nos pondremos en contacto pronto.")
+            except Exception as ex:
+                st.warning("⚠️ Ocurrió un error al registrar la cita.")
         else:
             st.warning("⚠️ Complete todos los campos.")
 
 # ==============================================================================
-# MÓDULO 5: QUEJAS, RECLAMOS Y SUGERENCIAS (PQRS)
+# MÓDULO 5: QUEJAS, RECLAMOS Y SUGERENCIAS (PQRS - Con ID único)
 # ==============================================================================
 elif menu_principal == "5. Quejas, Reclamos y Sugerencias (PQRS)":
     st.header("📝 Quejas, Reclamos y Sugerencias (PQRS)")
@@ -336,11 +384,15 @@ elif menu_principal == "5. Quejas, Reclamos y Sugerencias (PQRS)":
             radicado = f"PQRS-{random.randint(10000, 99999)}"
             try:
                 with conn.session as s:
+                    # Asegurar radicado único
+                    while s.execute(text("SELECT COUNT(*) FROM pqrs WHERE radicado = :rad"), {"rad": radicado}).fetchone()[0] > 0:
+                        radicado = f"PQRS-{random.randint(10000, 99999)}"
+                        
                     s.execute(text("INSERT INTO pqrs (radicado, categoria, subcategoria, detalle, estado) VALUES (:rad, :cat, :sub, :det, 'Enviado')"),
                               {"rad": radicado, "cat": cat, "sub": subcat, "det": detalle})
                     s.commit()
-                    st.success(f"[✓] Reporte guardado en Aiven.")
-            except:
+                    st.success(f"[✓] Reporte guardado con éxito en la base de datos.")
+            except Exception as ex:
                 pass
             st.markdown(f"**Número de Radicado:** `{radicado}`")
             st.markdown("💡 *«¡Recuerda que entre todos construimos una mejor comunidad educativa!»*")
