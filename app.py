@@ -233,7 +233,7 @@ elif menu_principal == "2. Pagos y Facturación":
                 st.warning("⚠️ Ingrese documento y referencia.")
 
 # ==============================================================================
-# MÓDULO 3: HORARIOS DE ATENCIÓN Y BIBLIOTECA
+# MÓDULO 3: HORARIOS DE ATENCIÓN Y BIBLIOTECA (Con Validación Anti-Duplicados)
 # ==============================================================================
 elif menu_principal == "3. Horarios de Atención y Biblioteca":
     st.header("⏰ Horarios de Atención y Biblioteca")
@@ -245,16 +245,26 @@ elif menu_principal == "3. Horarios de Atención y Biblioteca":
         jornada = st.selectbox("Jornada:", ["--- Seleccione ---", "Mañana", "Tarde"])
         hora = st.selectbox("Hora:", ["--- Seleccione ---", "8:00 AM", "9:00 AM", "10:00 AM", "2:00 PM", "3:00 PM"])
         doc_res = st.text_input("Documento o Nombre:")
+        
         if st.button("Confirmar Reserva"):
             if dia != "--- Seleccione ---" and hora != "--- Seleccione ---" and doc_res:
                 try:
                     with conn.session as s:
-                        s.execute(text("INSERT INTO reservas_dependencias (dependencia, dia, jornada, hora, documento_o_nombre) VALUES (:dep, :dia, :jor, :hor, :doc)"),
-                                  {"dep": op_h, "dia": dia, "jor": jornada, "hor": hora, "doc": doc_res})
-                        s.commit()
-                        st.success(f"[✓] Cupo guardado en Aiven para {op_h} el {dia} a las {hora}.")
-                except:
-                    st.success(f"[✓] Cupo apartado con éxito.")
+                        # Validar si ya existe un cupo en esa fecha/hora
+                        verificar = s.execute(text("""
+                            SELECT COUNT(*) FROM reservas_dependencias 
+                            WHERE dependencia = :dep AND dia = :dia AND jornada = :jor AND hora = :hor
+                        """), {"dep": op_h, "dia": dia, "jor": jornada, "hor": hora}).fetchone()[0]
+                        
+                        if verificar > 0:
+                            st.error(f"⚠️ Lo sentimos, el cupo para **{op_h}** el día **{dia}** en la jornada **{jornada}** a las **{hora}** ya está ocupado.")
+                        else:
+                            s.execute(text("INSERT INTO reservas_dependencias (dependencia, dia, jornada, hora, documento_o_nombre) VALUES (:dep, :dia, :jor, :hor, :doc)"),
+                                      {"dep": op_h, "dia": dia, "jor": jornada, "hor": hora, "doc": doc_res})
+                            s.commit()
+                            st.success(f"[✓] ¡Cupo guardado con éxito en Aiven para {op_h} ({dia} - {hora})!")
+                except Exception as ex:
+                    st.warning("⚠️ Ocurrió un error al validar o guardar la reserva.")
             else:
                 st.warning("⚠️ Complete todos los campos.")
 
@@ -265,18 +275,28 @@ elif menu_principal == "3. Horarios de Atención y Biblioteca":
         bloque = st.selectbox("Bloque horario:", ["--- Seleccione ---", "1ª Hora (7:00 - 7:50 AM)", "2ª Hora (7:50 - 8:40 AM)", "3ª Hora (10:00 - 10:50 AM)"])
         motivo = st.selectbox("Motivo:", ["--- Seleccione ---", "1. Investigación grupal", "2. Lectura individual", "3. Préstamo de material"])
         responsable = st.text_input("Nombre del docente o responsable:")
+        
         if st.button("Apartar Espacio en Biblioteca"):
             if sec != "--- Seleccione ---" and dia_b != "--- Seleccione ---" and bloque != "--- Seleccione ---" and motivo != "--- Seleccione ---" and responsable:
                 try:
                     with conn.session as s:
-                        s.execute(text("INSERT INTO reservas_biblioteca (seccion, dia, hora_bloque, responsable, motivo, estado) VALUES (:sec, :dia, :hor, :resp, :mot, 'RES')"),
-                                  {"sec": sec, "dia": dia_b, "hor": bloque, "resp": responsable, "mot": motivo})
-                        s.commit()
-                        st.success(f"[✓] Espacio guardado en Aiven para Biblioteca ({sec}).")
-                except:
-                    st.success(f"[✓] Espacio apartado con éxito.")
+                        # Validar si el bloque de biblioteca ya está ocupado
+                        verificar_bib = s.execute(text("""
+                            SELECT COUNT(*) FROM reservas_biblioteca 
+                            WHERE seccion = :sec AND dia = :dia AND hora_bloque = :hor
+                        """), {"sec": sec, "dia": dia_b, "hor": bloque}).fetchone()[0]
+                        
+                        if verificar_bib > 0:
+                            st.error(f"⚠️ El bloque **{bloque}** en la sección de **{sec}** para el día **{dia_b}** ya se encuentra ocupado.")
+                        else:
+                            s.execute(text("INSERT INTO reservas_biblioteca (seccion, dia, hora_bloque, responsable, motivo, estado) VALUES (:sec, :dia, :hor, :resp, :mot, 'RES')"),
+                                      {"sec": sec, "dia": dia_b, "hor": bloque, "resp": responsable, "mot": motivo})
+                            s.commit()
+                            st.success(f"[✓] ¡Espacio de biblioteca reservado con éxito en Aiven!")
+                except Exception as ex:
+                    st.warning("⚠️ Ocurrió un error al procesar la reserva.")
             else:
-                st.warning("⚠️ Complete todos los campos.")
+                st.warning("⚠️ Complete todos los campos, incluido el motivo.")
 
 # ==============================================================================
 # MÓDULO 4: ASESORÍA Y PSICOLOGÍA
