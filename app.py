@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 st.set_page_config(page_title="Chatbot Institución Educativa", page_icon="🤖", layout="centered")
 
-# --- CONEXIÓN AUTOMÁTICA Y CARGA COMPLETA DE TODOS LOS ESTUDIANTES ---
+# --- CONEXIÓN AUTOMÁTICA Y CARGA CON NOTAS VARIADAS ---
 try:
     conn = st.connection("mysql", type="sql")
     
@@ -93,7 +93,7 @@ try:
             """))
             s.commit()
             
-            # 12 Estudiantes con Nombres Reales
+            # Estudiantes con nombres reales
             estudiantes_datos = [
                 ('000000', 'Lucía Fernanda Gómez', 'Transición', 'lucia.gomez@colegio.edu.co'),
                 ('111111', 'Mateo Alexander Silva', 'Primero (1°)', 'mateo.silva@colegio.edu.co'),
@@ -117,26 +117,31 @@ try:
                 """), {"doc": est[0], "nom": est[1], "grad": est[2], "corr": est[3]})
             s.commit()
 
-            # Insertar notas únicas para TODOS los estudiantes si la tabla de notas está vacía
+            # Insertar notas con variación REAL en cada materia
             check_cal = s.execute(text("SELECT COUNT(*) FROM calificaciones")).fetchone()
             if check_cal[0] == 0:
                 est_ids = s.execute(text("SELECT id, documento, grado FROM estudiantes")).fetchall()
                 
-                # Reglas específicas de notas por cada estudiante/documento
+                # Reglas específicas de materias perdidas
                 reglas_estudiantes = {
-                    '000000': {'perdio': [], 'estado': 'excelente'},
-                    '111111': {'perdio': [], 'estado': 'alto'},
-                    '222222': {'perdio': ['Lenguaje'], 'estado': 'recupero'},
-                    '333333': {'perdio': ['Matemáticas'], 'estado': 'nivelo'},
-                    '444444': {'perdio': [], 'estado': 'excelente'},
-                    '555555': {'perdio': ['Ciencias Naturales'], 'estado': 'recupero'},
-                    '666666': {'perdio': ['Matemáticas'], 'estado': 'nivelo'},
-                    '777777': {'perdio': [], 'estado': 'basico'},
-                    '888888': {'perdio': ['Inglés'], 'estado': 'recupero'},
-                    '999999': {'perdio': ['Física', 'Química'], 'estado': 'nivelo'},
-                    '101010': {'perdio': ['Matemáticas'], 'estado': 'recupero'},
-                    '211111': {'perdio': ['Filosofía', 'Lectura Crítica'], 'estado': 'nivelo'}
+                    '000000': {'perdio': []},
+                    '111111': {'perdio': []},
+                    '222222': {'perdio': ['Lenguaje'], 'estado_perdio': 'recupero'},
+                    '333333': {'perdio': ['Matemáticas'], 'estado_perdio': 'nivelo'},
+                    '444444': {'perdio': []},
+                    '555555': {'perdio': ['Ciencias Naturales'], 'estado_perdio': 'recupero'},
+                    '666666': {'perdio': ['Matemáticas'], 'estado_perdio': 'nivelo'},
+                    '777777': {'perdio': []},
+                    '888888': {'perdio': ['Inglés'], 'estado_perdio': 'recupero'},
+                    '999999': {'perdio': ['Física', 'Química'], 'estado_perdio': 'nivelo'},
+                    '101010': {'perdio': ['Matemáticas'], 'estado_perdio': 'recupero'},
+                    '211111': {'perdio': ['Filosofía', 'Lectura Crítica'], 'estado_perdio': 'nivelo'}
                 }
+
+                # Generador de variación de notas aceptables (ganadas)
+                notas_ganadas_sh = [74.0, 81.0, 88.0, 92.0, 78.0, 85.0, 90.0, 76.0, 83.0, 95.0]
+                notas_ganadas_conv = [80.0, 85.0, 90.0, 95.0, 88.0, 82.0, 92.0, 84.0]
+                notas_ganadas_ext = [70.0, 80.0, 88.0, 75.0, 82.0, 90.0, 68.0]
 
                 for eid, doc, grad in est_ids:
                     es_bach = any(g in grad for g in ["6°", "7°", "8°", "9°", "10°", "11°", "Sexto", "Séptimo", "Octavo", "Noveno", "Décimo", "Undécimo"])
@@ -148,25 +153,26 @@ try:
                     else:
                         materias = ["Matemáticas", "Lenguaje", "Ciencias Naturales", "Ciencias Sociales", "Inglés"]
 
-                    regla = reglas_estudiantes.get(doc, {'perdio': [], 'estado': 'basico'})
+                    regla = reglas_estudiantes.get(doc, {'perdio': []})
 
-                    for m in materias:
+                    for idx, m in enumerate(materias):
                         if m in regla['perdio']:
-                            sh, conv, ext = 45.0, 55.0, 40.0
+                            # Asignar notas de pérdida variadas
+                            sh = 42.0 + (idx * 3.0)
+                            conv = 55.0 + (idx * 2.0)
+                            ext = 40.0 + (idx * 4.0)
                             definitiva = (sh * 0.7) + (conv * 0.25) + (ext * 0.05) if es_bach else (sh * 0.7) + (conv * 0.3)
                             
-                            if regla['estado'] == 'recupero':
-                                rec, niv, final = 72.0, 0.0, 72.0  # Pasó en recuperación
+                            if regla.get('estado_perdio') == 'recupero':
+                                rec, niv, final = 70.0 + (idx * 2.0), 0.0, 70.0 + (idx * 2.0)
                             else:
-                                rec, niv, final = 48.0, 68.0, 68.0  # Falló recuperación, pasó en nivelación
+                                rec, niv, final = 45.0, 68.0 + idx, 68.0 + idx
                         else:
-                            if regla['estado'] == 'excelente':
-                                sh, conv, ext = 92.0, 95.0, 90.0
-                            elif regla['estado'] == 'alto':
-                                sh, conv, ext = 85.0, 88.0, 82.0
-                            else:
-                                sh, conv, ext = 72.0, 75.0, 70.0
-                                
+                            # Asignar notas variadas para cada materia ganada
+                            sh = notas_ganadas_sh[idx % len(notas_ganadas_sh)]
+                            conv = notas_ganadas_conv[(idx + 2) % len(notas_ganadas_conv)]
+                            ext = notas_ganadas_ext[(idx + 1) % len(notas_ganadas_ext)]
+                            
                             definitiva = (sh * 0.7) + (conv * 0.25) + (ext * 0.05) if es_bach else (sh * 0.7) + (conv * 0.3)
                             rec, niv, final = 0.0, 0.0, int(round(definitiva))
 
