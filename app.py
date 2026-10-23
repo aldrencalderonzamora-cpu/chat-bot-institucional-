@@ -207,35 +207,41 @@ elif menu_principal == "2. Pagos y Facturación":
                 if op_pagos != "--- Seleccione ---":
                     if op_pagos == "Pago de Eventos":
                         sub_conceptos = ["Día de la Familia Javeriana ($30.000)", "Boleta Rifa Institucional ($15.000)"]
+                        es_evento = True
                     elif op_pagos == "Pruebas Saber (Grados 6° a 9°)":
                         sub_conceptos = ["Prueba 1 (Inicial) - $10.000", "Prueba 2 (Intermedia) - $10.000", "Prueba 3 (Final) - $10.000"]
+                        es_evento = False
                     else:
                         sub_conceptos = ["Preicfes Sesión 1 - $45.000", "Preicfes Sesión 2 - $45.000", "Preicfes Sesión 3 - $45.000", "Examen Oficial ICFES - $135.000"]
+                        es_evento = False
                         
                     concepto_sel = st.selectbox("Seleccione el concepto específico:", ["--- Seleccione ---"] + sub_conceptos)
                     
                     if concepto_sel != "--- Seleccione ---":
-                        # ------------------------------------------------------
-                        # LÓGICA DE JERARQUÍA / PRELACIÓN
-                        # ------------------------------------------------------
-                        # Semilla única basada en el Documento + la Categoría de Pago
                         seed_val = int(doc_estudiante) + sum(ord(c) for c in op_pagos)
                         rng = random.Random(seed_val)
                         
-                        # Determina hasta qué índice de la lista tiene pagado (Nivel de avance)
-                        # Ej: Nivel 0 = Ninguno pagado | Nivel 1 = Pagado hasta el primer ítem, etc.
-                        nivel_pago_aleatorio = rng.randint(0, len(sub_conceptos))
                         posicion_actual = sub_conceptos.index(concepto_sel)
                         
-                        # Validar si existe un pago registrado de forma real en Aiven
+                        # Validar si existe un pago registrado en la base de datos de Aiven
                         with conn.session as s:
                             pago_db = s.execute(text("""
                                 SELECT referencia_transaccion FROM pagos 
                                 WHERE estudiante_id = :eid AND concepto = :conc AND estado = 'Aprobado'
                             """), {"eid": est_id, "conc": concepto_sel}).fetchone()
                         
-                        # Regla Jerárquica: Si la posición del ítem es menor al nivel alcanzado o ya se pagó en DB -> PAGADO
-                        if pago_db or posicion_actual < nivel_pago_aleatorio:
+                        if es_evento:
+                            # Eventos: 50/50 independiente para cada evento
+                            seed_ev = int(doc_estudiante) + sum(ord(c) for c in concepto_sel)
+                            rng_ev = random.Random(seed_ev)
+                            estado_aleatorio = rng_ev.choice(["DEBE", "PAGADO"])
+                        else:
+                            # Pruebas / Preicfes: Jerarquía estricta (Nivel de avance secuencial)
+                            nivel_avance = rng.randint(0, len(sub_conceptos))
+                            # Si la posición de la prueba es menor al nivel alcanzado, está pagada en orden
+                            estado_aleatorio = "PAGADO" if posicion_actual < nivel_avance else "DEBE"
+                        
+                        if pago_db or estado_aleatorio == "PAGADO":
                             estado_final = "PAGADO"
                             ref_mostrada = pago_db[0] if pago_db else f"REF-SEQ-{rng.randint(1000, 9999)}"
                         else:
@@ -243,19 +249,14 @@ elif menu_principal == "2. Pagos y Facturación":
                         
                         st.write("---")
                         if estado_final == "PAGADO":
-                            st.info(f"🟢 **Estado del concepto:** **PAGADO** (Ref: #{ref_mostrada}). El estudiante se encuentra al día con esta obligación.")
+                            st.info(f"🟢 **Estado del concepto:** **PAGADO** (Ref: #{ref_mostrada}). El estudiante se encuentra al día.")
                         else:
-                            st.warning(f"🔴 **Estado del concepto:** **DEBE**. Debe cancelar esta prueba/sesión para continuar en la secuencia.")
+                            st.warning(f"🔴 **Estado del concepto:** **DEBE**. El estudiante tiene este concepto pendiente.")
                             
-                            # Verificar si la prueba anterior está pendiente para mostrar advertencia de prelación
-                            if posicion_actual > 0:
+                            if not es_evento and posicion_actual > 0:
                                 concepto_anterior = sub_conceptos[posicion_actual - 1]
-                                with conn.session as s:
-                                    pago_ant_db = s.execute(text("SELECT id FROM pagos WHERE estudiante_id = :eid AND concepto = :conc AND estado = 'Aprobado'"), {"eid": est_id, "conc": concepto_anterior}).fetchone()
-                                
-                                if not pago_ant_db and (posicion_actual - 1) >= nivel_pago_aleatorio:
-                                    st.caption(f"⚠️ *Nota: Se recomienda cancelar primero el concepto previo ({concepto_anterior}).*")
-
+                                st.caption(f"⚠️ *Nota de jerarquía: Se recomienda tener al día los conceptos previos (ej. {concepto_anterior}).*")
+                            
                             medio = st.selectbox("Medio de pago:", ["Bancolombia", "Nequi", "Daviplata", "MasterCard"])
                             ref_input = st.text_input("Ingrese la referencia de la transacción:")
                             
@@ -271,7 +272,7 @@ elif menu_principal == "2. Pagos y Facturación":
                                                 s.execute(text("INSERT INTO pagos (estudiante_id, concepto, valor, medio_pago, referencia_transaccion, estado) VALUES (:eid, :conc, :val, :med, :ref, 'Aprobado')"),
                                                           {"eid": est_id, "conc": concepto_sel, "val": val_pago, "med": medio, "ref": ref_input})
                                                 s.commit()
-                                                st.success(f"[✓] ¡Pago guardado con éxito en Aiven!")
+                                                st.success(f"[✓] ¡Pago registrado con éxito en Aiven!")
                                                 st.rerun()
                                     except Exception as ex:
                                         st.error("⚠️ Error al registrar el pago.")
