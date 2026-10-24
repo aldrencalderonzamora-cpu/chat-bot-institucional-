@@ -291,6 +291,9 @@ elif menu_principal == "3. Horarios de Atención y Biblioteca":
     st.header("⏰ Horarios de Atención y Biblioteca")
     op_h = st.selectbox("Seleccione:", ["--- Seleccione ---", "Administración y Secretaría", "Coordinaciones", "Biblioteca Institucional"])
     
+    # --------------------------------------------------------------------------
+    # OPCIÓN A: ADMINISTRACIÓN Y COORDINACIONES
+    # --------------------------------------------------------------------------
     if op_h in ["Administración y Secretaría", "Coordinaciones"]:
         st.write(f"**Horario de atención general:** Lunes a Viernes (Mañana: 8:00 AM - 10:00 AM | Tarde: 2:00 PM - 4:00 PM)")
         
@@ -343,58 +346,78 @@ elif menu_principal == "3. Horarios de Atención y Biblioteca":
         else:
             st.info("💡 Ingrese el número de documento registrado para habilitar la reserva.")
 
+    # --------------------------------------------------------------------------
+    # OPCIÓN B: BIBLIOTECA INSTITUCIONAL
+    # --------------------------------------------------------------------------
     elif op_h == "Biblioteca Institucional":
         st.write("**Horario:** Lunes a Viernes: 7:00 AM - 12:00 PM | 1:30 PM - 6:30 PM")
-        sec = st.selectbox("Sección:", ["--- Seleccione ---", "Primaria", "Bachillerato"])
-        dia_b = st.selectbox("Día:", ["--- Seleccione ---", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"])
         
-        if sec == "Primaria":
-            bloques_disp = [
-                "--- Seleccione ---",
-                "1ª Hora (7:00 - 7:50 AM)",
-                "2ª Hora (7:50 - 8:40 AM)",
-                "3ª Hora (8:40 - 9:40 AM)",
-                "4ª Hora (10:00 - 10:50 AM)",
-                "5ª Hora (10:50 - 11:40 AM)",
-                "6ª Hora (11:40 - 12:00 PM)"
-            ]
-        elif sec == "Bachillerato":
-            bloques_disp = [
-                "--- Seleccione ---",
-                "1ª Hora (12:30 - 1:30 PM)",
-                "2ª Hora (1:30 - 2:25 PM)",
-                "3ª Hora (2:25 - 3:20 PM)",
-                "4ª Hora (3:50 - 4:45 PM)",
-                "5ª Hora (4:45 - 5:40 PM)",
-                "6ª Hora (5:40 - 6:30 PM)"
-            ]
-        else:
-            bloques_disp = ["--- Seleccione ---"]
-            
-        bloque = st.selectbox("Bloque horario de clase:", bloques_disp)
-        motivo = st.selectbox("Motivo:", ["--- Seleccione ---", "1. Investigación grupal", "2. Lectura individual", "3. Préstamo de material"])
-        responsable = st.text_input("Nombre del docente o responsable:")
+        doc_biblio = st.text_input("Ingrese el número de documento del estudiante o docente responsable:")
         
-        if st.button("Apartar Espacio en Biblioteca"):
-            if sec != "--- Seleccione ---" and dia_b != "--- Seleccione ---" and bloque != "--- Seleccione ---" and motivo != "--- Seleccione ---" and responsable:
-                try:
-                    with conn.session as s:
-                        verificar_bib = s.execute(text("""
-                            SELECT COUNT(*) FROM reservas_biblioteca 
-                            WHERE seccion = :sec AND dia = :dia AND hora_bloque = :hor
-                        """), {"sec": sec, "dia": dia_b, "hor": bloque}).fetchone()[0]
+        if doc_biblio:
+            try:
+                with conn.session as s:
+                    est_bib = s.execute(text("SELECT nombre_completo, grado FROM estudiantes WHERE documento = :doc"), {"doc": doc_biblio}).fetchone()
+                
+                if est_bib:
+                    nombre_resp, grado_resp = est_bib[0], est_bib[1]
+                    st.success(f"Responsable verificado: **{nombre_resp}** | Grado: **{grado_resp}**")
+                    
+                    sec = st.selectbox("Sección:", ["--- Seleccione ---", "Primaria", "Bachillerato"])
+                    dia_b = st.selectbox("Día:", ["--- Seleccione ---", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"])
+                    
+                    if sec == "Primaria":
+                        bloques_disp = [
+                            "--- Seleccione ---",
+                            "1ª Hora (7:00 - 7:50 AM)",
+                            "2ª Hora (7:50 - 8:40 AM)",
+                            "3ª Hora (8:40 - 9:40 AM)",
+                            "4ª Hora (10:00 - 10:50 AM)",
+                            "5ª Hora (10:50 - 11:40 AM)",
+                            "6ª Hora (11:40 - 12:00 PM)"
+                        ]
+                    elif sec == "Bachillerato":
+                        bloques_disp = [
+                            "--- Seleccione ---",
+                            "1ª Hora (12:30 - 1:30 PM)",
+                            "2ª Hora (1:30 - 2:25 PM)",
+                            "3ª Hora (2:25 - 3:20 PM)",
+                            "4ª Hora (3:50 - 4:45 PM)",
+                            "5ª Hora (4:45 - 5:40 PM)",
+                            "6ª Hora (5:40 - 6:30 PM)"
+                        ]
+                    else:
+                        bloques_disp = ["--- Seleccione ---"]
                         
-                        if verificar_bib > 0:
-                            st.error(f"⚠️ El bloque **{bloque}** en la sección de **{sec}** para el día **{dia_b}** ya se encuentra ocupado.")
+                    bloque = st.selectbox("Bloque horario de clase:", bloques_disp)
+                    motivo = st.selectbox("Motivo:", ["--- Seleccione ---", "1. Investigación grupal", "2. Lectura individual", "3. Préstamo de material"])
+                    
+                    if st.button("Apartar Espacio en Biblioteca"):
+                        if sec != "--- Seleccione ---" and dia_b != "--- Seleccione ---" and bloque != "--- Seleccione ---" and motivo != "--- Seleccione ---":
+                            try:
+                                with conn.session as s:
+                                    verificar_bib = s.execute(text("""
+                                        SELECT COUNT(*) FROM reservas_biblioteca 
+                                        WHERE seccion = :sec AND dia = :dia AND hora_bloque = :hor
+                                    """), {"sec": sec, "dia": dia_b, "hor": bloque}).fetchone()[0]
+                                    
+                                    if verificar_bib > 0:
+                                        st.error(f"⚠️ El bloque **{bloque}** en la sección de **{sec}** para el día **{dia_b}** ya se encuentra ocupado.")
+                                    else:
+                                        s.execute(text("INSERT INTO reservas_biblioteca (seccion, dia, hora_bloque, responsable, motivo, estado) VALUES (:sec, :dia, :hor, :resp, :mot, 'RES')"),
+                                                  {"sec": sec, "dia": dia_b, "hor": bloque, "resp": f"{nombre_resp} ({doc_biblio})", "mot": motivo})
+                                        s.commit()
+                                        st.success(f"[✓] ¡Espacio de biblioteca reservado con éxito en Aiven para {nombre_resp}!")
+                            except Exception as ex:
+                                st.warning("⚠️ Ocurrió un error al procesar la reserva.")
                         else:
-                            s.execute(text("INSERT INTO reservas_biblioteca (seccion, dia, hora_bloque, responsable, motivo, estado) VALUES (:sec, :dia, :hor, :resp, :mot, 'RES')"),
-                                      {"sec": sec, "dia": dia_b, "hor": bloque, "resp": responsable, "mot": motivo})
-                            s.commit()
-                            st.success(f"[✓] ¡Espacio de biblioteca reservado con éxito en Aiven!")
-                except Exception as ex:
-                    st.warning("⚠️ Ocurrió un error al procesar la reserva.")
-            else:
-                st.warning("⚠️ Complete todos los campos.")
+                            st.warning("⚠️ Complete todos los campos requeridos.")
+                else:
+                    st.error("⚠️ El número de documento no está registrado en la base de datos.")
+            except Exception as ex:
+                st.warning("⚠️ Error al verificar el documento.")
+        else:
+            st.info("💡 Ingrese el número de documento para habilitar la reserva de biblioteca.")
 # ==============================================================================
 # MÓDULO 4: ASESORÍA Y PSICOLOGÍA
 # ==============================================================================
