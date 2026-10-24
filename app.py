@@ -293,39 +293,55 @@ elif menu_principal == "3. Horarios de Atención y Biblioteca":
     
     if op_h in ["Administración y Secretaría", "Coordinaciones"]:
         st.write(f"**Horario de atención general:** Lunes a Viernes (Mañana: 8:00 AM - 10:00 AM | Tarde: 2:00 PM - 4:00 PM)")
-        dia = st.selectbox("Día:", ["--- Seleccione ---", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"])
-        jornada = st.selectbox("Jornada:", ["--- Seleccione ---", "Mañana", "Tarde"])
         
-        if jornada == "Mañana":
-            hora = st.selectbox("Hora:", ["--- Seleccione ---", "8:00 AM", "8:30 AM", "9:00 AM", "9:30 AM", "10:00 AM"])
-        elif jornada == "Tarde":
-            hora = st.selectbox("Hora:", ["--- Seleccione ---", "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM", "4:00 PM"])
-        else:
-            hora = "--- Seleccione ---"
-            st.info("💡 Seleccione una jornada para habilitar las horas correspondientes.")
+        doc_res = st.text_input("Ingrese el número de documento del estudiante / acudiente:")
+        
+        if doc_res:
+            try:
+                with conn.session as s:
+                    est_val = s.execute(text("SELECT nombre_completo, grado FROM estudiantes WHERE documento = :doc"), {"doc": doc_res}).fetchone()
+                
+                if est_val:
+                    st.success(f"Estudiante verificado: **{est_val[0]}** ({est_val[1]})")
+                    
+                    dia = st.selectbox("Día:", ["--- Seleccione ---", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"])
+                    jornada = st.selectbox("Jornada:", ["--- Seleccione ---", "Mañana", "Tarde"])
+                    
+                    if jornada == "Mañana":
+                        hora = st.selectbox("Hora:", ["--- Seleccione ---", "8:00 AM", "8:30 AM", "9:00 AM", "9:30 AM", "10:00 AM"])
+                    elif jornada == "Tarde":
+                        hora = st.selectbox("Hora:", ["--- Seleccione ---", "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM", "4:00 PM"])
+                    else:
+                        hora = "--- Seleccione ---"
+                        st.info("💡 Seleccione una jornada para habilitar las horas.")
 
-        doc_res = st.text_input("Documento o Nombre:")
-        
-        if st.button("Confirmar Reserva"):
-            if dia != "--- Seleccione ---" and jornada != "--- Seleccione ---" and hora != "--- Seleccione ---" and doc_res:
-                try:
-                    with conn.session as s:
-                        verificar = s.execute(text("""
-                            SELECT COUNT(*) FROM reservas_dependencias 
-                            WHERE dependencia = :dep AND dia = :dia AND jornada = :jor AND hora = :hor
-                        """), {"dep": op_h, "dia": dia, "jor": jornada, "hor": hora}).fetchone()[0]
-                        
-                        if verificar > 0:
-                            st.error(f"⚠️ Lo sentimos, el cupo para **{op_h}** el día **{dia}** en la jornada **{jornada}** a las **{hora}** ya está ocupado.")
+                    if st.button("Confirmar Reserva"):
+                        if dia != "--- Seleccione ---" and jornada != "--- Seleccione ---" and hora != "--- Seleccione ---":
+                            try:
+                                with conn.session as s:
+                                    verificar = s.execute(text("""
+                                        SELECT COUNT(*) FROM reservas_dependencias 
+                                        WHERE dependencia = :dep AND dia = :dia AND jornada = :jor AND hora = :hor
+                                    """), {"dep": op_h, "dia": dia, "jor": jornada, "hor": hora}).fetchone()[0]
+                                    
+                                    if verificar > 0:
+                                        st.error(f"⚠️ Lo sentimos, el cupo para **{op_h}** el día **{dia}** a las **{hora}** ya está ocupado.")
+                                    else:
+                                        identificador = f"{est_val[0]} (Doc: {doc_res})"
+                                        s.execute(text("INSERT INTO reservas_dependencias (dependencia, dia, jornada, hora, documento_o_nombre) VALUES (:dep, :dia, :jor, :hor, :doc)"),
+                                                  {"dep": op_h, "dia": dia, "jor": jornada, "hor": hora, "doc": identificador})
+                                        s.commit()
+                                        st.success(f"[✓] ¡Cupo guardado con éxito en Aiven para {op_h}!")
+                            except Exception as ex:
+                                st.warning("⚠️ Ocurrió un error al guardar la reserva.")
                         else:
-                            s.execute(text("INSERT INTO reservas_dependencias (dependencia, dia, jornada, hora, documento_o_nombre) VALUES (:dep, :dia, :jor, :hor, :doc)"),
-                                      {"dep": op_h, "dia": dia, "jor": jornada, "hor": hora, "doc": doc_res})
-                            s.commit()
-                            st.success(f"[✓] ¡Cupo guardado con éxito en Aiven para {op_h} ({dia} {jornada} - {hora})!")
-                except Exception as ex:
-                    st.warning("⚠️ Ocurrió un error al guardar la reserva.")
-            else:
-                st.warning("⚠️ Complete todos los campos correctamente.")
+                            st.warning("⚠️ Complete todos los campos de fecha y hora.")
+                else:
+                    st.error("⚠️ El número de documento no se encuentra registrado en la base de datos. No se puede apartar el cupo.")
+            except Exception as ex:
+                st.warning("⚠️ Error al verificar el documento.")
+        else:
+            st.info("💡 Ingrese el número de documento registrado para habilitar la reserva.")
 
     elif op_h == "Biblioteca Institucional":
         st.write("**Horario:** Lunes a Viernes: 7:00 AM - 12:00 PM | 1:30 PM - 6:30 PM")
@@ -379,38 +395,50 @@ elif menu_principal == "3. Horarios de Atención y Biblioteca":
                     st.warning("⚠️ Ocurrió un error al procesar la reserva.")
             else:
                 st.warning("⚠️ Complete todos los campos.")
-
 # ==============================================================================
 # MÓDULO 4: ASESORÍA Y PSICOLOGÍA
 # ==============================================================================
 elif menu_principal == "4. Asesoría, Psicología y Bienestar":
     st.header("🧠 Asesoría, Psicología y Bienestar Escolar")
     area = st.selectbox("Seleccione área:", ["--- Seleccione ---", "Psicología Escolar", "Fonoaudiología", "Terapia Ocupacional"])
-    nombre_p = st.text_input("Nombre completo del estudiante:")
-    grado_p = st.text_input("Grado (ej. 8°B):")
-    contacto_p = st.text_input("Teléfono o correo de contacto:")
-    modalidad_p = st.selectbox("Modalidad:", ["Individual (Estudiante)", "Familiar"])
     
-    if st.button("Registrar Solicitud / Cita"):
-        if nombre_p and grado_p and contacto_p:
-            try:
-                with conn.session as s:
-                    dup_cita = s.execute(text("""
-                        SELECT COUNT(*) FROM citas_psicologia 
-                        WHERE estudiante_nombre = :nom AND contacto = :cont AND estado = 'Solicitada'
-                    """), {"nom": nombre_p, "cont": contacto_p}).fetchone()[0]
-                    
-                    if dup_cita > 0:
-                        st.warning(f"⚠️ Ya existe una solicitud de cita pendiente para **{nombre_p}**.")
-                    else:
-                        s.execute(text("INSERT INTO citas_psicologia (estudiante_nombre, grado, contacto, modalidad, estado) VALUES (:nom, :grad, :cont, :mod, 'Solicitada')"),
-                                  {"nom": nombre_p, "grad": grado_p, "cont": contacto_p, "mod": modalidad_p})
-                        s.commit()
-                        st.success(f"[✓] Cita guardada en Aiven para {nombre_p}.")
-            except Exception as ex:
-                st.warning("⚠️ Error al registrar la cita.")
-        else:
-            st.warning("⚠️ Complete todos los campos.")
+    doc_psico = st.text_input("Ingrese el número de documento del estudiante:")
+    
+    if doc_psico:
+        try:
+            with conn.session as s:
+                est_psico = s.execute(text("SELECT nombre_completo, grado FROM estudiantes WHERE documento = :doc"), {"doc": doc_psico}).fetchone()
+            
+            if est_psico:
+                nombre_p, grado_p = est_psico[0], est_psico[1]
+                st.success(f"Estudiante validado: **{nombre_p}** | Grado: **{grado_p}**")
+                
+                contacto_p = st.text_input("Teléfono o correo de contacto (Opcional):", value="N/A")
+                modalidad_p = st.selectbox("Modalidad:", ["Individual (Estudiante)", "Familiar"])
+                
+                if st.button("Registrar Solicitud / Cita"):
+                    try:
+                        with conn.session as s:
+                            dup_cita = s.execute(text("""
+                                SELECT COUNT(*) FROM citas_psicologia 
+                                WHERE estudiante_nombre = :nom AND estado = 'Solicitada'
+                            """), {"nom": nombre_p}).fetchone()[0]
+                            
+                            if dup_cita > 0:
+                                st.warning(f"⚠️ Ya existe una solicitud de cita pendiente para **{nombre_p}**.")
+                            else:
+                                s.execute(text("INSERT INTO citas_psicologia (estudiante_nombre, grado, contacto, modalidad, estado) VALUES (:nom, :grad, :cont, :mod, 'Solicitada')"),
+                                          {"nom": nombre_p, "grad": grado_p, "cont": contacto_p, "mod": modalidad_p})
+                                s.commit()
+                                st.success(f"[✓] Cita guardada en Aiven para {nombre_p} ({grado_p}).")
+                    except Exception as ex:
+                        st.warning("⚠️ Error al registrar la cita.")
+            else:
+                st.error("⚠️ El documento ingresado no corresponde a ningún estudiante registrado en la base de datos.")
+        except Exception as ex:
+            st.warning("⚠️ Error al consultar el estudiante.")
+    else:
+        st.info("💡 Ingrese el número de documento del estudiante para validar automáticamente su nombre y grado.")
 
 # ==============================================================================
 # MÓDULO 5: QUEJAS, RECLAMOS Y SUGERENCIAS (PQRS)
