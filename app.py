@@ -119,7 +119,7 @@ menu_principal = st.selectbox(
 # ==============================================================================
 # MÓDULO 1: INFORMACIÓN ACADÉMICA
 # ==============================================================================
-if menu_principal == "1. Información Académica y Calificaciones":
+ if menu_principal == "1. Información Académica y Calificaciones":
     st.header("📚 Información Académica y Calificaciones")
     doc_academico = st.text_input("Ingrese el número de documento del estudiante (ej. 000000, 101010, 211111):", key="doc_acad")
     
@@ -132,12 +132,15 @@ if menu_principal == "1. Información Académica y Calificaciones":
                 nombre_est, grado_est = est_info[0], est_info[1]
                 st.success(f"Estudiante: **{nombre_est}** | Grado: **{grado_est}**")
                 
-                es_bach = any(g in grado_est for g in ["6°", "7°", "8°", "9°", "10°", "11°", "Sexto", "Séptimo", "Octavo", "Noveno", "Décimo", "Undécimo"])
-                
+                # Definición de asignaturas según la estructura curricular exacta
                 if "Transición" in grado_est:
                     materias = ["Dimensión Socio Afectiva", "Dimensión Comunicativa", "Dimensión Cognitiva", "Dimensión Corporal", "Dimensión Artística"]
-                elif es_bach:
-                    materias = ["Matemáticas", "Lenguaje", "Ciencias Naturales", "Física", "Química", "Filosofía", "Lectura Crítica", "Inglés"]
+                elif any(g in grado_est for g in ["Primero", "Segundo", "Tercero", "Cuarto", "Quinto", "1°", "2°", "3°", "4°", "5°", "Sexto", "Séptimo", "Octavo", "6°", "7°", "8°"]):
+                    materias = ["Matemáticas", "Lenguaje", "Ciencias Naturales", "Ciencias Sociales", "Inglés"]
+                elif any(g in grado_est for g in ["Noveno", "9°"]):
+                    materias = ["Matemáticas", "Lenguaje", "Biología", "Química", "Física", "Historia", "Inglés", "geografía"]
+                elif any(g in grado_est for g in ["Décimo", "Undécimo", "10°", "11°"]):
+                    materias = ["Matemáticas", "Lenguaje", "Biología", "Química", "Física", "Lectura Crítica", "Filosofía", "Economía", "Ciencias Políticas", "Inglés"]
                 else:
                     materias = ["Matemáticas", "Lenguaje", "Ciencias Naturales", "Ciencias Sociales", "Inglés"]
                 
@@ -147,9 +150,11 @@ if menu_principal == "1. Información Académica y Calificaciones":
                     seed_val = int(doc_academico) + sum(ord(c) for c in mat_sel)
                     rng = random.Random(seed_val)
                     
-                    sh = round(rng.uniform(30.0, 98.0), 1)
+                    es_bach = not ("Transición" in grado_est or any(g in grado_est for g in ["Primero", "Segundo", "Tercero", "Cuarto", "Quinto", "1°", "2°", "3°", "4°", "5°"]))
+                    
+                    sh = round(rng.uniform(30.0, 100.0), 1)
                     conv = round(rng.uniform(60.0, 100.0), 1)
-                    ext = round(rng.uniform(20.0, 100.0), 1) if es_bach else 0.0
+                    ext = round(rng.uniform(20.0, 95.0), 1) if es_bach else 0.0
                     
                     if es_bach:
                         definitiva = int(round((sh * 0.70) + (conv * 0.25) + (ext * 0.05)))
